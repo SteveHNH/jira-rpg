@@ -7,7 +7,18 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "./scripts/test-all.sh",
+    "test:fast": "./scripts/test-all.sh --fast",
+    "test:webhook": "./scripts/test-webhook.sh all",
+    "test:story": "./scripts/test-story.sh full", 
+    "test:health": "./scripts/health-check.sh",
+    "webhook:list": "./scripts/test-webhook.sh list",
+    "webhook:progress": "./scripts/test-webhook.sh inProgress",
+    "webhook:done": "./scripts/test-webhook.sh done",
+    "story:health": "./scripts/test-story.sh health",
+    "story:generate": "./scripts/test-story.sh story",
+    "story:guild": "./scripts/test-story.sh guild",
+    "story:benchmark": "./scripts/test-story.sh benchmark"
   },
   "keywords": [],
   "author": "",

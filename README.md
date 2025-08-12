@@ -69,6 +69,21 @@ The development server will start at `http://localhost:3000`
 
 ### 4. Test the Setup
 
+**⚠️ Important: Ensure `vercel dev` is running first!**
+
+```bash
+# Quick health check (recommended first test)
+npm run test:health
+
+# Full test suite
+npm test
+
+# Individual component tests
+npm run webhook:progress
+npm run story:generate
+```
+
+**Manual testing (if npm scripts aren't working):**
 ```bash
 # Test webhook processing
 curl http://localhost:3000/api/test
@@ -82,7 +97,59 @@ curl http://localhost:3000/api/other-test?test=story
 
 ### Development Testing
 
-#### 1. Test JIRA Webhook Processing
+**Prerequisites**: Start the development server first:
+```bash
+npm run dev  # or vercel dev
+```
+
+#### Automated Testing Scripts
+
+**Quick Testing:**
+```bash
+# System health check
+npm run test:health
+
+# Fast test suite (skips performance tests)
+npm test:fast
+
+# Full comprehensive test suite
+npm test
+```
+
+**Webhook Testing:**
+```bash
+# List available test scenarios
+npm run webhook:list
+
+# Test specific webhook scenarios
+npm run webhook:progress    # Test "In Progress" scenario
+npm run webhook:done        # Test "Done" scenario
+
+# Test all webhook scenarios
+npm run test:webhook
+```
+
+**Story Generation Testing:**
+```bash
+# Check Ollama AI health
+npm run story:health
+
+# Generate sample fantasy story
+npm run story:generate
+
+# Test guild extraction from JIRA data
+npm run story:guild
+
+# Performance benchmark (5 story requests)
+npm run story:benchmark
+
+# Full story generation test suite
+npm run test:story
+```
+
+#### Manual Testing (Advanced)
+
+**1. JIRA Webhook Processing**
 ```bash
 # View available test scenarios
 curl http://localhost:3000/api/test
@@ -99,7 +166,7 @@ curl -X POST http://localhost:3000/api/test \
   -d '{"issue": {...}, "user": {...}}'
 ```
 
-#### 2. Test Story Generation
+**2. Story Generation**
 ```bash
 # Check Ollama health
 curl http://localhost:3000/api/other-test?test=health
@@ -114,9 +181,14 @@ curl http://localhost:3000/api/other-test?test=guild
 curl http://localhost:3000/api/other-test?test=full
 ```
 
-#### 3. Pretty Print JSON Output
-Add `-s | jq` for formatted responses:
+**3. Pretty Print JSON Output**
+All automated scripts support `--pretty` flag (requires `jq`):
 ```bash
+# Automated scripts with pretty output
+./scripts/test-webhook.sh inProgress --pretty
+./scripts/test-story.sh story --pretty
+
+# Manual curl with jq
 curl -s http://localhost:3000/api/test | jq
 curl -s -X POST http://localhost:3000/api/test?scenario=inProgress | jq
 ```
@@ -211,10 +283,16 @@ jira-rpg/
 │   ├── user-service.js        # User XP/level operations (planned)
 │   ├── slack.js               # Slack API helpers (planned)
 │   └── openai.js              # OpenAI integration (legacy)
+├── scripts/
+│   ├── test-all.sh            # Comprehensive test runner
+│   ├── test-webhook.sh        # Webhook testing scenarios
+│   ├── test-story.sh          # Story generation testing
+│   ├── health-check.sh        # System health validation
+│   └── README.md              # Testing scripts documentation
 ├── .env.example               # Environment template
 ├── CLAUDE.md                  # Project context for AI
 ├── ARCHITECTURE.md            # Technical documentation
-└── package.json               # Dependencies and scripts
+└── package.json               # Dependencies and NPM scripts
 ```
 
 ## 🎮 Game Mechanics
@@ -301,22 +379,130 @@ curl https://your-app.vercel.app/api/other-test?test=health
 
 ## 🧪 Testing Strategy
 
-### Unit Testing (Planned)
-```bash
-# Run tests
-npm test
+**⚠️ Prerequisites**: Always start development server first with `npm run dev`
 
-# Test specific components
-npm test -- --grep "story-generator"
+### Automated Testing Infrastructure
+
+**Quick Testing Commands:**
+```bash
+# System health check (recommended first)
+npm run test:health
+
+# Fast test suite (2-3 minutes)
+npm test:fast
+
+# Full comprehensive test suite (5-10 minutes)
+npm test
 ```
 
-### Integration Testing
+**Individual Component Testing:**
 ```bash
-# Test complete webhook flow
-./scripts/test-webhook-flow.sh
+# Webhook functionality
+npm run test:webhook         # All webhook scenarios
+npm run webhook:progress     # Just "In Progress" scenario
+npm run webhook:done         # Just "Done" scenario
 
-# Test story generation pipeline
-./scripts/test-story-pipeline.sh
+# Story generation
+npm run test:story          # Full story generation suite
+npm run story:health        # Just Ollama health check
+npm run story:generate      # Just story generation
+npm run story:benchmark     # Performance testing
+```
+
+### Testing Scripts Documentation
+
+All testing scripts are located in `./scripts/` directory:
+
+- **`test-all.sh`** - Orchestrates comprehensive testing with colored output
+- **`test-webhook.sh`** - JIRA webhook testing with multiple scenarios
+- **`test-story.sh`** - AI story generation testing and benchmarking
+- **`health-check.sh`** - System health validation (APIs, database, configuration)
+
+**Script Features:**
+- ✅ Colored output for easy reading
+- 🔧 Automatic server connectivity checks
+- 📊 Performance benchmarking
+- 🛠️ Detailed error reporting
+- 📋 JSON formatting with `--pretty` flag
+
+### Development Workflow Testing
+
+**1. Initial Setup Validation:**
+```bash
+# After cloning and configuring environment
+npm run test:health
+```
+
+**2. Feature Development Testing:**
+```bash
+# Quick validation during development
+npm test:fast
+
+# Test specific component you're working on
+npm run webhook:progress  # for webhook changes
+npm run story:generate    # for story generation changes
+```
+
+**3. Pre-deployment Testing:**
+```bash
+# Full test suite before committing
+npm test
+
+# Verify performance hasn't degraded
+npm run story:benchmark
+```
+
+### Manual Testing (Advanced Users)
+
+**Direct Script Execution:**
+```bash
+# Run scripts directly with options
+./scripts/test-webhook.sh all --pretty
+./scripts/test-story.sh full --pretty
+./scripts/health-check.sh --verbose
+
+# Test with custom base URL
+BASE_URL=https://your-app.vercel.app ./scripts/test-all.sh
+```
+
+### Environment Testing
+
+**Local Development:**
+```bash
+# Default localhost testing
+npm test
+
+# Ensure vercel dev is running first
+npm run dev  # in one terminal
+npm test     # in another terminal
+```
+
+**Production Testing:**
+```bash
+# Test deployed application
+BASE_URL=https://your-app.vercel.app npm run test:health
+BASE_URL=https://your-app.vercel.app npm run story:health
+```
+
+### Continuous Integration Ready
+
+All scripts are designed to work in CI/CD environments:
+```yaml
+# Example GitHub Actions workflow
+- name: Install dependencies
+  run: npm install
+
+- name: Start development server
+  run: npm run dev &
+
+- name: Wait for server
+  run: sleep 10
+
+- name: Run health check
+  run: npm run test:health
+
+- name: Run full test suite
+  run: npm test
 ```
 
 ## 🤝 Contributing
