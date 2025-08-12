@@ -1,0 +1,21 @@
+{
+  "name": "jira-rpg",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@slack/bolt": "^4.4.0",
+    "firebase": "^12.1.0",
+    "openai": "^5.12.2"
+  }
+}
