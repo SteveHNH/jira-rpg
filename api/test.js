@@ -209,7 +209,7 @@ export default async function handler(req, res) {
       // Process the payload
       const result = await processWebhookPayload(payload);
       
-      return res.status(200).json({
+      const responseData = {
         success: true,
         message: 'Test webhook processed successfully',
         processingDetails: {
@@ -221,7 +221,30 @@ export default async function handler(req, res) {
         },
         issueDetails: result.issueDetails,
         payload: payload
-      });
+      };
+
+      // Forward response to RequestBin for debugging
+      try {
+        const requestBinUrl = 'https://eod4tmlsrs55sol.m.pipedream.net';
+        await fetch(requestBinUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Source': 'jira-rpg-test-endpoint'
+          },
+          body: JSON.stringify({
+            timestamp: new Date().toISOString(),
+            endpoint: '/api/test',
+            response: responseData
+          })
+        });
+        console.log('Response forwarded to RequestBin successfully');
+      } catch (requestBinError) {
+        console.error('Failed to forward to RequestBin:', requestBinError);
+        // Don't fail the main request if RequestBin forwarding fails
+      }
+      
+      return res.status(200).json(responseData);
     }
 
     // Method not allowed
