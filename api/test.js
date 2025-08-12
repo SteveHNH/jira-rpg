@@ -2,6 +2,9 @@ import { db } from '../lib/firebase.js';
 import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
 import { testStoryGeneration, checkOllamaHealth, extractGuildInfo } from '../lib/story-generator.js';
 
+// RequestBin URL for debugging responses
+const REQUEST_BIN_URL = 'https://eod4tmlsrs55sol.m.pipedream.net';
+
 // Mock JIRA webhook payloads for testing - JIRAPLAY hackathon project
 const mockPayloads = {
   inProgress: {
@@ -300,8 +303,7 @@ export default async function handler(req, res) {
 
       // Forward webhook processing response to RequestBin for debugging
       try {
-        const requestBinUrl = 'https://eod4tmlsrs55sol.m.pipedream.net';
-        await fetch(requestBinUrl, {
+        await fetch(REQUEST_BIN_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -322,8 +324,7 @@ export default async function handler(req, res) {
       // Forward story generation results to RequestBin for debugging
       if (storyGeneration) {
         try {
-          const requestBinUrl = 'https://eod4tmlsrs55sol.m.pipedream.net';
-          await fetch(requestBinUrl, {
+          await fetch(REQUEST_BIN_URL, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
