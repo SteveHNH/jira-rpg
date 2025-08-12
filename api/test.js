@@ -1,71 +1,31 @@
 import { db } from '../lib/firebase.js';
 import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
 
-// Mock JIRA webhook payloads for testing
+// Mock JIRA webhook payloads for testing - JIRAPLAY hackathon project
 const mockPayloads = {
-  issueCreated: {
-    webhookEvent: 'jira:issue_created',
-    issue: {
-      key: 'TEST-123',
-      fields: {
-        summary: 'Test issue created',
-        issuetype: { name: 'Task' },
-        priority: { name: 'Medium' },
-        status: { name: 'To Do' }
-      }
-    },
-    user: {
-      name: 'test.user',
-      emailAddress: 'test.user@company.com',
-      displayName: 'Test User'
-    }
-  },
-  issueAssigned: {
+  inProgress: {
     webhookEvent: 'jira:issue_updated',
     issue: {
-      key: 'TEST-124',
+      key: 'JIRAPLAY-123',
       fields: {
-        summary: 'Test issue assigned',
+        summary: 'Hackathon test issue moved to In Progress',
         issuetype: { name: 'Story' },
-        priority: { name: 'High' },
-        status: { name: 'To Do' },
+        priority: { name: 'Medium' },
+        status: { name: 'In Progress' },
+        project: { key: 'JIRAPLAY', name: 'JIRAPLAY' },
+        components: [{ name: 'hackathon-test' }],
+        customfield_10016: 3, // Story points
         assignee: {
-          name: 'test.user',
-          emailAddress: 'test.user@company.com',
-          displayName: 'Test User'
+          name: 'hackathon.user',
+          emailAddress: 'hackathon.user@company.com',
+          displayName: 'Hackathon User'
         }
       }
     },
     user: {
-      name: 'test.user',
-      emailAddress: 'test.user@company.com',
-      displayName: 'Test User'
-    },
-    changelog: {
-      items: [
-        {
-          field: 'assignee',
-          fromString: null,
-          toString: 'test.user'
-        }
-      ]
-    }
-  },
-  issueInProgress: {
-    webhookEvent: 'jira:issue_updated',
-    issue: {
-      key: 'TEST-125',
-      fields: {
-        summary: 'Test issue in progress',
-        issuetype: { name: 'Bug' },
-        priority: { name: 'Critical' },
-        status: { name: 'In Progress' }
-      }
-    },
-    user: {
-      name: 'test.user',
-      emailAddress: 'test.user@company.com',
-      displayName: 'Test User'
+      name: 'hackathon.user',
+      emailAddress: 'hackathon.user@company.com',
+      displayName: 'Hackathon User'
     },
     changelog: {
       items: [
@@ -77,22 +37,29 @@ const mockPayloads = {
       ]
     }
   },
-  issueCompleted: {
+  done: {
     webhookEvent: 'jira:issue_updated',
     issue: {
-      key: 'TEST-126',
+      key: 'JIRAPLAY-124',
       fields: {
-        summary: 'Test issue completed',
+        summary: 'Hackathon test issue completed',
         issuetype: { name: 'Story' },
-        priority: { name: 'Medium' },
+        priority: { name: 'High' },
         status: { name: 'Done' },
-        customfield_10016: 5 // Story points
+        project: { key: 'JIRAPLAY', name: 'JIRAPLAY' },
+        components: [{ name: 'hackathon-test' }],
+        customfield_10016: 5, // Story points
+        assignee: {
+          name: 'hackathon.user',
+          emailAddress: 'hackathon.user@company.com',
+          displayName: 'Hackathon User'
+        }
       }
     },
     user: {
-      name: 'test.user',
-      emailAddress: 'test.user@company.com',
-      displayName: 'Test User'
+      name: 'hackathon.user',
+      emailAddress: 'hackathon.user@company.com',
+      displayName: 'Hackathon User'
     },
     changelog: {
       items: [

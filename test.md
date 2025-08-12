@@ -2,12 +2,19 @@
 
 ## Overview
 
-The `/api/test` endpoint allows you to test JIRA webhook event handling without configuring actual JIRA webhooks. This is essential for development and debugging the XP award system.
+The `/api/test` endpoint allows you to test JIRA webhook event handling for hackathon project status changes. This endpoint is essential for development and debugging the XP award system.
 
 ## Endpoint URL
 
-- **Local Development**: `http://localhost:3000/api/test`
 - **Production**: `https://your-domain.vercel.app/api/test`
+- **Local Development**: `http://localhost:3000/api/test`
+
+## JIRA Webhook Configuration
+
+The endpoint is configured to receive webhooks for:
+- **Events**: Issue Updated (status changes to "In Progress" or "Done")
+- **Component**: hackathon-test
+- **Filters**: Status transitions for project issues
 
 ## Testing Methods
 
@@ -21,16 +28,21 @@ curl https://your-domain.vercel.app/api/test
 ```json
 {
   "message": "JIRA RPG Webhook Test Endpoint",
-  "availableScenarios": ["issueCreated", "issueAssigned", "issueInProgress", "issueCompleted"],
+  "availableScenarios": ["inProgress", "done"],
   "usage": {
     "testScenario": "POST /api/test?scenario=<scenarioName>",
     "customPayload": "POST /api/test (with custom payload in body)"
   },
   "scenarios": [
     {
-      "name": "issueCreated",
-      "description": "jira:issue_created",
-      "issueKey": "TEST-123"
+      "name": "inProgress",
+      "description": "jira:issue_updated",
+      "issueKey": "PROJECT-123"
+    },
+    {
+      "name": "done",
+      "description": "jira:issue_updated", 
+      "issueKey": "PROJECT-124"
     }
   ]
 }
@@ -38,24 +50,14 @@ curl https://your-domain.vercel.app/api/test
 
 ### 2. Test Predefined Scenarios (POST)
 
-#### Issue Created
+#### Issue moved to In Progress
 ```bash
-curl -X POST "https://your-domain.vercel.app/api/test?scenario=issueCreated"
+curl -X POST "https://your-domain.vercel.app/api/test?scenario=inProgress"
 ```
 
-#### Issue Assigned
+#### Issue completed (Done)
 ```bash
-curl -X POST "https://your-domain.vercel.app/api/test?scenario=issueAssigned"
-```
-
-#### Issue In Progress
-```bash
-curl -X POST "https://your-domain.vercel.app/api/test?scenario=issueInProgress"
-```
-
-#### Issue Completed
-```bash
-curl -X POST "https://your-domain.vercel.app/api/test?scenario=issueCompleted"
+curl -X POST "https://your-domain.vercel.app/api/test?scenario=done"
 ```
 
 ### 3. Test Custom Payloads (POST)
@@ -66,18 +68,17 @@ curl -X POST https://your-domain.vercel.app/api/test \
   -d '{
     "webhookEvent": "jira:issue_updated",
     "issue": {
-      "key": "CUSTOM-123",
+      "key": "PROJECT-999",
       "fields": {
-        "summary": "Custom test issue",
-        "issuetype": { "name": "Task" },
+        "summary": "Custom hackathon test issue",
+        "issuetype": { "name": "Story" },
         "status": { "name": "Done" },
         "priority": { "name": "High" },
-        "project": { "key": "CUSTOM", "name": "Custom Project" },
+        "project": { "key": "PROJECT", "name": "Your Project" },
         "components": [
-          { "name": "Backend" },
-          { "name": "API" }
+          { "name": "hackathon-test" }
         ],
-        "customfield_10016": 3,
+        "customfield_10016": 8,
         "assignee": {
           "name": "your.username",
           "emailAddress": "your.email@company.com",
@@ -110,9 +111,9 @@ curl -X POST https://your-domain.vercel.app/api/test \
   "success": true,
   "message": "Test webhook processed successfully",
   "processingDetails": {
-    "userAffected": "test.user@company.com",
+    "userAffected": "hackathon.user@company.com",
     "eventType": "jira:issue_updated",
-    "issueKey": "TEST-126",
+    "issueKey": "PROJECT-124",
     "xpAwarded": 50,
     "userStats": {
       "totalXp": 150,
@@ -122,19 +123,19 @@ curl -X POST https://your-domain.vercel.app/api/test \
   },
   "issueDetails": {
     "eventType": "jira:issue_updated",
-    "issueKey": "TEST-126",
-    "project": "TEST",
-    "component": "Frontend, UI",
+    "issueKey": "PROJECT-124",
+    "project": "PROJECT",
+    "component": "hackathon-test",
     "storyPoints": 5,
     "assignee": {
-      "name": "test.user",
-      "displayName": "Test User",
-      "emailAddress": "test.user@company.com"
+      "name": "hackathon.user",
+      "displayName": "Hackathon User",
+      "emailAddress": "hackathon.user@company.com"
     },
-    "description": "Test issue completed",
+    "description": "Hackathon test issue completed",
     "status": "Done",
     "issueType": "Story",
-    "priority": "Medium"
+    "priority": "High"
   },
   "payload": {
     // The complete payload that was processed
@@ -146,18 +147,16 @@ curl -X POST https://your-domain.vercel.app/api/test \
 ```json
 {
   "error": "No payload provided. Use ?scenario=<name> or send payload in body",
-  "availableScenarios": ["issueCreated", "issueAssigned", "issueInProgress", "issueCompleted"]
+  "availableScenarios": ["inProgress", "done"]
 }
 ```
 
 ## Available Test Scenarios
 
-| Scenario | Event Type | Description | Issue Key |
-|----------|------------|-------------|-----------|
-| `issueCreated` | `jira:issue_created` | New issue created | TEST-123 |
-| `issueAssigned` | `jira:issue_updated` | Issue assigned to user | TEST-124 |
-| `issueInProgress` | `jira:issue_updated` | Status changed to In Progress | TEST-125 |
-| `issueCompleted` | `jira:issue_updated` | Issue completed with story points | TEST-126 |
+| Scenario | Event Type | Description | Issue Key | Status Change |
+|----------|------------|-------------|-----------|---------------|
+| `inProgress` | `jira:issue_updated` | Issue moved to In Progress | PROJECT-123 | To Do → In Progress |
+| `done` | `jira:issue_updated` | Issue completed | PROJECT-124 | In Progress → Done |
 
 ## Issue Details Extraction
 
@@ -199,7 +198,7 @@ Subsequent tests with the same user will increment their XP.
 
 You can also test in a browser by visiting:
 ```
-https://your-domain.vercel.app/api/test?scenario=issueCompleted
+https://your-domain.vercel.app/api/test?scenario=done
 ```
 
 ## Local Development Testing
@@ -211,7 +210,7 @@ https://your-domain.vercel.app/api/test?scenario=issueCompleted
 
 2. Test locally:
    ```bash
-   curl -X POST "http://localhost:3000/api/test?scenario=issueCreated"
+   curl -X POST "http://localhost:3000/api/test?scenario=inProgress"
    ```
 
 ## Troubleshooting
