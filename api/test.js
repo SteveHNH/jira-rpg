@@ -1,5 +1,9 @@
 import { db } from '../lib/firebase.js';
 import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { testStoryGeneration, checkOllamaHealth, extractGuildInfo } from '../lib/story-generator.js';
+
+// RequestBin URL for debugging responses
+const REQUEST_BIN_URL = 'https://eod4tmlsrs55sol.m.pipedream.net';
 
 // Mock JIRA webhook payloads for testing - JIRAPLAY hackathon project
 const mockPayloads = {
@@ -100,6 +104,46 @@ function extractIssueDetails(payload) {
     status: fields.status?.name,
     issueType: fields.issuetype?.name,
     priority: fields.priority?.name
+  };
+}
+
+// Transform webhook payload to story generator format
+function transformWebhookToTicketData(payload) {
+  const issue = payload.issue;
+  const fields = issue?.fields || {};
+  
+  // Helper function to extract description text from JIRA's complex description format
+  function extractDescription(description) {
+    if (!description) return null;
+    if (typeof description === 'string') return description;
+    if (description.content && Array.isArray(description.content)) {
+      return description.content
+        .map(block => {
+          if (block.content && Array.isArray(block.content)) {
+            return block.content.map(item => item.text || '').join(' ');
+          }
+          return '';
+        })
+        .join(' ')
+        .trim();
+    }
+    return null;
+  }
+  
+  return {
+    assignee: fields.assignee?.displayName || 'Unknown Hero',
+    title: fields.summary || 'Mysterious Quest',
+    description: extractDescription(fields.description) || 'A quest awaits...',
+    status: fields.status?.name || 'Unknown',
+    reporter: payload.user?.displayName || 'Quest Giver',
+    comments: `Event: ${payload.webhookEvent}`, 
+    ticketKey: issue?.key || 'UNKNOWN',
+    ticketType: fields.issuetype?.name || 'Task',
+    priority: fields.priority?.name || 'Medium',
+    storyPoints: fields.customfield_10016 || null,
+    project: fields.project?.key || 'UNKNOWN',
+    components: fields.components?.map(c => c.name) || [],
+    labels: fields.labels || []
   };
 }
 
@@ -209,6 +253,39 @@ export default async function handler(req, res) {
       // Process the payload
       const result = await processWebhookPayload(payload);
       
+      // Generate story from the JIRA payload
+      let storyGeneration = null;
+      try {
+        console.log('Generating fantasy story for issue:', result.issueDetails.issueKey);
+        
+        // Transform webhook payload to ticket data format
+        const ticketData = transformWebhookToTicketData(payload);
+        console.log('Transformed ticket data:', ticketData);
+        
+        const [ollamaHealth, guildInfo, storyResult] = await Promise.all([
+          checkOllamaHealth(),
+          extractGuildInfo(payload.issue),
+          testStoryGeneration(ticketData) // Pass transformed data instead of using hardcoded test data
+        ]);
+        
+        storyGeneration = {
+          narrative: storyResult,
+          guildInfo: guildInfo,
+          ollamaHealth: ollamaHealth,
+          ticketData: ticketData, // Include transformed data for debugging
+          timestamp: new Date().toISOString()
+        };
+        
+        console.log('Story generation completed successfully');
+      } catch (storyError) {
+        console.error('Story generation failed:', storyError);
+        storyGeneration = {
+          error: 'Story generation failed',
+          message: storyError.message,
+          timestamp: new Date().toISOString()
+        };
+      }
+      
       const responseData = {
         success: true,
         message: 'Test webhook processed successfully',
@@ -220,28 +297,51 @@ export default async function handler(req, res) {
           userStats: result.userStats
         },
         issueDetails: result.issueDetails,
+        storyGeneration: storyGeneration,
         payload: payload
       };
 
-      // Forward response to RequestBin for debugging
+      // Forward webhook processing response to RequestBin for debugging
       try {
-        const requestBinUrl = 'https://eod4tmlsrs55sol.m.pipedream.net';
-        await fetch(requestBinUrl, {
+        await fetch(REQUEST_BIN_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Source': 'jira-rpg-test-endpoint'
+            'X-Source': 'jira-rpg-webhook-processing'
           },
           body: JSON.stringify({
             timestamp: new Date().toISOString(),
             endpoint: '/api/test',
+            type: 'webhook-processing',
             response: responseData
           })
         });
-        console.log('Response forwarded to RequestBin successfully');
+        console.log('Webhook processing response forwarded to RequestBin successfully');
       } catch (requestBinError) {
-        console.error('Failed to forward to RequestBin:', requestBinError);
-        // Don't fail the main request if RequestBin forwarding fails
+        console.error('Failed to forward webhook processing to RequestBin:', requestBinError);
+      }
+
+      // Forward story generation results to RequestBin for debugging
+      if (storyGeneration) {
+        try {
+          await fetch(REQUEST_BIN_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Source': 'jira-rpg-story-generation'
+            },
+            body: JSON.stringify({
+              timestamp: new Date().toISOString(),
+              endpoint: '/api/test',
+              type: 'story-generation',
+              issueKey: result.issueDetails.issueKey,
+              storyGeneration: storyGeneration
+            })
+          });
+          console.log('Story generation response forwarded to RequestBin successfully');
+        } catch (requestBinError) {
+          console.error('Failed to forward story generation to RequestBin:', requestBinError);
+        }
       }
       
       return res.status(200).json(responseData);
