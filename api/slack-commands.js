@@ -19,10 +19,11 @@ import {
 } from '../lib/guild-service.js';
 
 export default async function handler(req, res) {
-  console.log('Slack command received:', {
+  console.log('Slack request received:', {
     method: req.method,
-    headers: req.headers,
-    body: req.body
+    contentType: req.headers['content-type'],
+    hasPayload: !!req.body.payload,
+    bodyKeys: Object.keys(req.body || {})
   });
 
   if (req.method !== 'POST') {
@@ -39,9 +40,19 @@ export default async function handler(req, res) {
 
     // Check if this is a modal submission or slash command
     if (req.body.payload) {
-      // This is an interactive component (modal submission)
-      const payload = JSON.parse(req.body.payload);
-      return await handleInteractiveComponent(payload, res);
+      console.log('Modal submission detected, parsing payload...');
+      try {
+        const payload = JSON.parse(req.body.payload);
+        console.log('Parsed payload:', {
+          type: payload.type,
+          callback_id: payload.view?.callback_id,
+          user_id: payload.user?.id
+        });
+        return await handleInteractiveComponent(payload, res);
+      } catch (error) {
+        console.error('Failed to parse modal payload:', error);
+        return res.status(400).json({ error: 'Invalid payload' });
+      }
     }
 
     // Parse the slash command data
@@ -949,32 +960,58 @@ The guild is in good hands. Thank you for your leadership, **${result.oldLeader}
 
 async function handleInteractiveComponent(payload, res) {
   try {
-    console.log('Interactive component received:', payload.type);
+    console.log('Interactive component received:', {
+      type: payload.type,
+      callback_id: payload.view?.callback_id,
+      hasUser: !!payload.user
+    });
     
     if (payload.type === 'view_submission') {
-      if (payload.view.callback_id === 'guild_create_modal') {
+      console.log('Processing view submission...');
+      if (payload.view?.callback_id === 'guild_create_modal') {
+        console.log('Handling guild create modal submission');
         return await handleGuildCreateSubmission(payload, res);
+      } else {
+        console.log('Unknown callback_id:', payload.view?.callback_id);
       }
+    } else {
+      console.log('Non-view_submission type:', payload.type);
     }
     
+    console.log('No handler found, returning empty response');
     return res.status(200).json({});
     
   } catch (error) {
     console.error('Interactive component error:', error);
-    return res.status(200).json({});
+    return res.status(200).json({
+      response_action: 'errors',
+      errors: {
+        general: 'Internal error processing form'
+      }
+    });
   }
 }
 
 async function handleGuildCreateSubmission(payload, res) {
   try {
+    console.log('Guild create submission started');
     const userId = payload.user.id;
     const values = payload.view.state.values;
     
-    // Extract form values
-    const channelId = values.channel_block.channel_select.selected_channel;
-    const guildName = values.name_block.guild_name_input.value;
-    const componentsInput = values.components_block.components_input.value || '';
-    const labelsInput = values.labels_block.labels_input.value || '';
+    console.log('Form values structure:', JSON.stringify(values, null, 2));
+    
+    // Extract form values with better error handling
+    const channelId = values.channel_block?.channel_select?.selected_channel;
+    const guildName = values.name_block?.guild_name_input?.value;
+    const componentsInput = values.components_block?.components_input?.value || '';
+    const labelsInput = values.labels_block?.labels_input?.value || '';
+    
+    console.log('Extracted values:', {
+      channelId,
+      guildName,
+      componentsInput,
+      labelsInput
+    });
     
     // Parse components and labels
     const components = componentsInput 
