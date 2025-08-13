@@ -42,13 +42,24 @@ async function processWebhookPayload(payload) {
     userData = userSnap.data();
   }
   
+  // Debug payload structure before XP calculation
+  await debugLog({
+    hasChangelog: !!payload.changelog,
+    changelogItems: payload.changelog?.items,
+    webhookEvent: payload.webhookEvent,
+    issueStatus: payload.issue?.fields?.status?.name
+  }, 'xp-debug-payload');
+  
   // Award XP using dynamic calculation system
   const xpResult = await awardXpFromWebhook(userId, payload);
+  
+  // Debug XP calculation result
+  await debugLog(xpResult, 'xp-result');
   
   // Get final user data
   const finalUserSnap = await getDoc(userRef);
   const finalUserData = finalUserSnap.data();
-  await debugLog(finalUserData, 'user data');
+  await debugLog(finalUserData, 'user-data');
   
 
   return {
