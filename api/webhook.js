@@ -111,6 +111,7 @@ export default async function handler(req, res) {
       };
       
       console.log('Story generation completed successfully');
+      await debugLog(storyGeneration, 'story-log');
     } catch (storyError) {
       console.error('Story generation failed:', storyError);
       storyGeneration = {
