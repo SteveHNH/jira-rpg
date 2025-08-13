@@ -770,8 +770,17 @@ async function handleGuildRenameCommand(userId, text, channelId) {
       currentGuildName = context.guild.name;
     } else {
       // In DM, need to determine which guild to rename
+      const { getUserBySlackId } = await import('../lib/user-service.js');
+      const user = await getUserBySlackId(userId);
+      if (!user) {
+        return {
+          text: '❌ User not found in RPG system.',
+          response_type: 'ephemeral'
+        };
+      }
+      
       const userGuilds = await getGuildsByUser(userId);
-      const leaderGuilds = userGuilds.filter(guild => guild.leaderId === (await import('../lib/user-service.js')).getUserBySlackId(userId).then(user => user?.jiraUsername));
+      const leaderGuilds = userGuilds.filter(guild => guild.leaderId === user.jiraUsername);
       
       if (leaderGuilds.length === 0) {
         return {
