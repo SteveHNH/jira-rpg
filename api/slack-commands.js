@@ -113,7 +113,7 @@ async function handleHelpCommand() {
 
 📊 **Player Commands:**
 • \`/rpg-status\` - Check your level, XP, and achievements
-• \`/rpg-register <jira-username>\` - Link your Slack to JIRA
+• \`/rpg-register <email>\` - Link your Slack to JIRA
 • \`/rpg-achievements\` - View your unlocked achievements
 
 🏰 **Guild Commands:**
@@ -150,7 +150,7 @@ async function handleStatusCommand(userId, userName) {
       return {
         text: `👋 Welcome to the RPG, ${userName}! 
 
-You're not registered yet. Complete a JIRA ticket to automatically join, or use \`/rpg-register <your-jira-username>\` to link your account manually.
+You're not registered yet. Complete a JIRA ticket to automatically join, or use \`/rpg-register <your.email@company.com>\` to link your account manually.
 
 Once registered, you'll start earning XP and leveling up! 🗡️`,
         response_type: 'ephemeral'
@@ -186,19 +186,28 @@ Keep completing tickets to level up! 🌟`;
   }
 }
 
-async function handleRegisterCommand(userId, userName, jiraUsername) {
-  if (!jiraUsername || jiraUsername.trim() === '') {
+async function handleRegisterCommand(userId, userName, email) {
+  if (!email || email.trim() === '') {
     return {
-      text: '❓ Please provide your JIRA username: `/rpg-register your.jira.username`',
+      text: '❓ Please provide your email address: `/rpg-register your.email@company.com`',
+      response_type: 'ephemeral'
+    };
+  }
+  
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email.trim())) {
+    return {
+      text: '❌ Please provide a valid email address: `/rpg-register your.email@company.com`',
       response_type: 'ephemeral'
     };
   }
   
   // TODO: Implement user registration logic
-  // This would link the Slack user ID to a JIRA username
+  // This would link the Slack user ID to a JIRA email
   
   return {
-    text: `✅ Registration coming soon! For now, complete a JIRA ticket and you'll be automatically registered as **${jiraUsername}**.`,
+    text: `✅ Registration coming soon! For now, complete a JIRA ticket and you'll be automatically registered with email **${email.trim()}**.`,
     response_type: 'ephemeral'
   };
 }
