@@ -131,3 +131,5 @@ jira-rpg/
 - Implement production webhook endpoint (`api/webhook.js`)
 - Add Slack bot integration (`api/slack-commands.js`)
 - Complete Firestore user management system
+
+- Always create a plan.md when we start a feature request
