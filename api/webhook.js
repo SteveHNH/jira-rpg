@@ -1,9 +1,66 @@
 import { db } from '../lib/firebase.js';
-import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { testStoryGeneration, checkOllamaHealth, extractGuildInfo } from '../lib/story-generator.js';
+import { awardXpFromWebhook } from '../lib/user-service.js';
+import { getTitleForLevel } from '../lib/xp-calculator.js';
+import { transformWebhookToTicketData, extractIssueDetails } from '../lib/data-processing.js';
+
+// Process webhook payload with proper XP calculation and story generation
+async function processWebhookPayload(payload) {
+  const { issue, user } = payload;
+  
+  if (!user) {
+    throw new Error('No user found in payload');
+  }
+
+  const userId = user.emailAddress || user.name || user.displayName || 'unknown-user';
+  
+  // Extract issue details
+  const issueDetails = extractIssueDetails(payload);
+  
+  // Get user data
+  const userRef = doc(db, 'users', userId);
+  const userSnap = await getDoc(userRef);
+  
+  let userData;
+  if (!userSnap.exists()) {
+    // Create new user
+    userData = {
+      slackUserId: null,
+      jiraUsername: user.name || userId,
+      displayName: user.displayName || user.name || userId,
+      xp: 0,
+      level: 1,
+      currentTitle: getTitleForLevel(1),
+      joinedAt: new Date(),
+      lastActivity: new Date()
+    };
+    await setDoc(userRef, userData);
+  } else {
+    userData = userSnap.data();
+  }
+  
+  // Award XP using dynamic calculation system
+  const xpResult = await awardXpFromWebhook(userId, payload);
+  
+  // Get final user data
+  const finalUserSnap = await getDoc(userRef);
+  const finalUserData = finalUserSnap.data();
+  
+  return {
+    userId,
+    xpResult,
+    userStats: {
+      totalXp: finalUserData.xp,
+      level: finalUserData.level,
+      title: finalUserData.currentTitle
+    },
+    issueDetails
+  };
+}
 
 export default async function handler(req, res) {
-  // Log the incoming request for debugging
-  console.log('Webhook received:', {
+  console.log('Production webhook received:', {
     method: req.method,
     body: req.body,
     headers: req.headers
@@ -23,53 +80,72 @@ export default async function handler(req, res) {
       });
     }
 
-    const { issue, user } = req.body;
+    const payload = req.body;
     
-    // Use email or name as user identifier
-    const userId = user.emailAddress || user.name || user.displayName || 'unknown-user';
+    // Process the webhook payload
+    const result = await processWebhookPayload(payload);
     
-    console.log('Processing for user:', userId);
-    
-    // Get user data
-    const userRef = doc(db, 'users', userId);
-    const userSnap = await getDoc(userRef);
-    
-    if (!userSnap.exists()) {
-      console.log('Creating new user:', userId);
-      // Create new user
-      await setDoc(userRef, {
-        slackUserId: null,
-        jiraUsername: user.name || userId,
-        displayName: user.displayName || user.name || userId,
-        xp: 0,
-        level: 1,
-        currentTitle: "Novice Adventurer",
-        joinedAt: new Date(),
-        lastActivity: new Date()
-      });
+    // Generate story from the JIRA payload
+    let storyGeneration = null;
+    try {
+      console.log('Generating fantasy story for issue:', result.issueDetails.issueKey);
+      
+      // Transform webhook payload to ticket data format
+      const ticketData = transformWebhookToTicketData(payload);
+      console.log('Transformed ticket data:', ticketData);
+      
+      const [ollamaHealth, guildInfo, storyResult] = await Promise.all([
+        checkOllamaHealth(),
+        extractGuildInfo(payload.issue),
+        testStoryGeneration(ticketData)
+      ]);
+      
+      storyGeneration = {
+        narrative: storyResult,
+        guildInfo: guildInfo,
+        ollamaHealth: ollamaHealth,
+        ticketData: ticketData,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('Story generation completed successfully');
+    } catch (storyError) {
+      console.error('Story generation failed:', storyError);
+      storyGeneration = {
+        error: 'Story generation failed',
+        message: storyError.message,
+        timestamp: new Date().toISOString()
+      };
     }
     
-    // Award XP (simplified - just give 50 XP for any webhook)
-    console.log('Awarding XP to user:', userId);
-    await updateDoc(userRef, {
-      xp: increment(50),
-      lastActivity: new Date()
-    });
+    const responseData = {
+      success: true,
+      message: 'Production webhook processed successfully',
+      processingDetails: {
+        userAffected: result.userId,
+        xpAwarded: result.xpResult.xpAwarded,
+        xpReason: result.xpResult.reason,
+        levelUp: result.xpResult.leveledUp ? {
+          oldLevel: result.xpResult.oldLevel,
+          newLevel: result.xpResult.newLevel,
+          oldTitle: result.xpResult.oldTitle,
+          newTitle: result.xpResult.newTitle
+        } : null,
+        userStats: result.userStats
+      },
+      issueDetails: result.issueDetails,
+      storyGeneration: storyGeneration
+    };
     
-    console.log('Webhook processed successfully');
-    
-    res.status(200).json({ 
-      success: true, 
-      message: 'User XP updated',
-      userId: userId,
-      xpAwarded: 50
-    });
+    console.log('Production webhook processed successfully');
+    res.status(200).json(responseData);
     
   } catch (error) {
-    console.error('Webhook error:', error);
+    console.error('Production webhook error:', error);
     res.status(500).json({ 
       error: 'Internal server error',
-      message: error.message 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
