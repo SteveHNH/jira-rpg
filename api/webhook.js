@@ -4,6 +4,7 @@ import { testStoryGeneration, checkOllamaHealth, extractGuildInfo } from '../lib
 import { awardXpFromWebhook } from '../lib/user-service.js';
 import { getTitleForLevel } from '../lib/xp-calculator.js';
 import { transformWebhookToTicketData, extractIssueDetails } from '../lib/data-processing.js';
+import { debugLog } from '../lib/req-debug.js';
 
 // Process webhook payload with proper XP calculation and story generation
 async function processWebhookPayload(payload) {
@@ -92,6 +93,7 @@ export default async function handler(req, res) {
       
       // Transform webhook payload to ticket data format
       const ticketData = transformWebhookToTicketData(payload);
+      await debugLog(ticketData, 'ticket-reansformation');
       console.log('Transformed ticket data:', ticketData);
       
       const [ollamaHealth, guildInfo, storyResult] = await Promise.all([
