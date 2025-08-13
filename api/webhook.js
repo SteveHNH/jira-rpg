@@ -47,7 +47,9 @@ async function processWebhookPayload(payload) {
   // Get final user data
   const finalUserSnap = await getDoc(userRef);
   const finalUserData = finalUserSnap.data();
+  await debugLog(finalUserData, 'user data');
   
+
   return {
     userId,
     xpResult,
