@@ -1,6 +1,7 @@
 import { db } from '../lib/firebase.js';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { testStoryGeneration, checkOllamaHealth, extractGuildInfo } from '../lib/story-generator.js';
+import { sendStoryNotification } from '../lib/slack-service.js';
 import { awardXpFromWebhook, getUserBySlackId } from '../lib/user-service.js';
 import { calculateLevel, getTitleForLevel } from '../lib/xp-calculator.js';
 import { transformWebhookToTicketData, extractIssueDetails } from '../lib/data-processing.js';
@@ -185,6 +186,7 @@ export default async function handler(req, res) {
       
       // Generate story from the JIRA payload
       let storyGeneration = null;
+      let slackNotification = null;
       try {
         console.log('Generating fantasy story for issue:', result.issueDetails.issueKey);
         
@@ -207,6 +209,30 @@ export default async function handler(req, res) {
         };
         
         console.log('Story generation completed successfully');
+        
+        // Send Slack notification with the generated story
+        try {
+          console.log('Sending Slack notification for story...');
+          const ticketInfo = {
+            issueKey: result.issueDetails.issueKey,
+            issueUrl: result.issueDetails.issueUrl,
+            summary: result.issueDetails.summary
+          };
+          
+          slackNotification = await sendStoryNotification(
+            storyGeneration,
+            ticketInfo,
+            payload.user
+          );
+          
+          console.log('Slack notification result:', slackNotification);
+        } catch (slackError) {
+          console.error('Slack notification failed:', slackError);
+          slackNotification = {
+            success: false,
+            error: slackError.message
+          };
+        }
       } catch (storyError) {
         console.error('Story generation failed:', storyError);
         storyGeneration = {
@@ -233,6 +259,7 @@ export default async function handler(req, res) {
         },
         issueDetails: result.issueDetails,
         storyGeneration: storyGeneration,
+        slackNotification: slackNotification,
         payload: payload
       };
 
