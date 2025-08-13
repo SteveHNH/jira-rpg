@@ -3,7 +3,7 @@
 import { verifySlackRequest } from '../lib/slack.js';
 import { db } from '../lib/firebase.js';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { createUser } from '../lib/user-service.js';
+import { createUser, getUserBySlackId } from '../lib/user-service.js';
 import { validateSlackChannel, validateCommandContext } from '../lib/slack-service.js';
 import { 
   createGuild,
@@ -770,7 +770,6 @@ async function handleGuildRenameCommand(userId, text, channelId) {
       currentGuildName = context.guild.name;
     } else {
       // In DM, need to determine which guild to rename
-      const { getUserBySlackId } = await import('../lib/user-service.js');
       const user = await getUserBySlackId(userId);
       if (!user) {
         return {
