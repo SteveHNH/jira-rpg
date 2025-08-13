@@ -11,6 +11,7 @@ import {
   leaveGuild,
   getAllActiveGuilds,
   getGuildByName,
+  getGuildById,
   getGuildsByUser,
   renameGuild,
   kickGuildMember,
@@ -235,12 +236,26 @@ Once registered, you'll start earning XP and leveling up! 🗡️`,
     const userData = querySnapshot.docs[0].data();
     const progressToNext = calculateProgressToNextLevel(userData.xp, userData.level);
     
-    const statusText = `🏆 **${userData.displayName}** *(${userData.currentTitle})*
+    // Resolve guild IDs to guild names
+    let guildNames = 'None';
+    if (userData.guilds && userData.guilds.length > 0) {
+      const guildNamePromises = userData.guilds.map(async (guildId) => {
+        const guild = await getGuildById(guildId);
+        return guild ? guild.name : `Unknown Guild (${guildId})`;
+      });
+      const resolvedGuildNames = await Promise.all(guildNamePromises);
+      guildNames = resolvedGuildNames.join(', ');
+    }
+    
+    const statusText = `🏆 **${userName}** *(${userData.currentTitle})*
 
 📊 **Level ${userData.level}** | **${userData.xp} XP**
 📈 Progress to Level ${userData.level + 1}: ${progressToNext.current}/${progressToNext.needed} XP (${progressToNext.percentage}%)
 
-🏰 **Guilds:** ${userData.guilds?.join(', ') || 'None'}
+🏰 **Guilds:** ${guildNames}
+⚔️ **Total Quests:** ${userData.totalTickets || 0}
+🐛 **Bugs Slain:** ${userData.totalBugs || 0}
+🕐 **Last Quest:** ${userData.lastActivity ? new Date(userData.lastActivity.seconds * 1000).toLocaleDateString() : 'Never'}
 
 Keep completing tickets to level up! 🌟`;
 
