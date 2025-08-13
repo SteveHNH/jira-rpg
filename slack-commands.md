@@ -17,6 +17,9 @@ Make sure your bot has these OAuth scopes:
 - `conversations.info` - Get channel details
 - `conversations.members` - Check channel membership
 - `users:read` - Read user information
+- `commands` - Handle slash commands (likely already configured)
+
+**Note:** Slack modals use the existing bot token permissions. No additional scopes are needed for the `views.open` API call - it uses your bot's existing `chat:write` capabilities.
 
 ---
 
@@ -72,9 +75,9 @@ Make sure your bot has these OAuth scopes:
 ### /rpg-guild-create
 **Command:** `/rpg-guild-create`  
 **Request URL:** `https://your-domain.vercel.app/api/slack-commands`  
-**Short Description:** Create a new guild with JIRA mapping  
-**Usage Hint:** `/rpg-guild-create #dev-frontend "Frontend Warriors" UI,React frontend,ui-bug`  
-**Escape channels, users, and links sent to your app:** ☐ Unchecked (need raw channel IDs)
+**Short Description:** Create a new guild with JIRA mapping (opens form)  
+**Usage Hint:** `/rpg-guild-create`  
+**Escape channels, users, and links sent to your app:** ☑️ Checked
 
 ---
 
@@ -197,10 +200,14 @@ Replace `https://your-domain.vercel.app` with your actual Vercel deployment URL.
 
 ### Escape Settings
 - **Checked (☑️):** For commands that work with escaped mentions like `<@U123456|username>`
-- **Unchecked (☐):** For commands that need raw IDs like `/rpg-guild-create` and `/rpg-guild-kick`
+- **Unchecked (☐):** For commands that need raw IDs like `/rpg-guild-kick` and `/rpg-guild-transfer`
 
-### Guild Creation Special Note
-The `/rpg-guild-create` command needs raw channel IDs to validate channels properly. When users type `#dev-frontend`, Slack sends `<#C123456|dev-frontend>` which our parser extracts the channel ID from.
+### Guild Creation Modal
+The `/rpg-guild-create` command opens a user-friendly modal form where users can:
+- Select a channel from a dropdown
+- Enter guild name, components, and labels in separate fields
+- Get validation feedback before creation
+- Specify components OR labels OR both (at least one required)
 
 ## Environment Variables Required
 
@@ -223,7 +230,7 @@ After configuring, test each command in this order:
 1. `/rpg-help` - Verify basic connectivity
 2. `/rpg-register your.email@company.com` - Create user account
 3. `/rpg-status` - Check user data
-4. `/rpg-guild-create #test-channel "Test Guild" TestComponent test-label` - Create guild
+4. `/rpg-guild-create` - Create guild (opens form)
 5. `/rpg-guild-list` - Verify guild creation
 6. `/rpg-guild-join "Test Guild"` - Test joining
 7. `/rpg-guild-info "Test Guild"` - Check guild details

@@ -37,6 +37,13 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    // Check if this is a modal submission or slash command
+    if (req.body.payload) {
+      // This is an interactive component (modal submission)
+      const payload = JSON.parse(req.body.payload);
+      return await handleInteractiveComponent(payload, res);
+    }
+
     // Parse the slash command data
     const {
       command,
@@ -81,7 +88,7 @@ export default async function handler(req, res) {
         break;
       
       case '/rpg-guild-create':
-        response = await handleGuildCreateCommand(user_id, user_name, text, channel_id);
+        response = await handleGuildCreateModalCommand(req.body.trigger_id);
         break;
       
       case '/rpg-guild-join':
@@ -164,7 +171,7 @@ async function handleHelpCommand() {
 
 🏰 **Guild Commands:**
 • \`/rpg-guild-list\` - List available guilds
-• \`/rpg-guild-create <#channel> "<name>" <components> [labels]\` - Create new guild
+• \`/rpg-guild-create\` - Create new guild (opens form)
 • \`/rpg-guild-join <guild-name>\` - Join a guild
 • \`/rpg-guild-leave [guild-name]\` - Leave a guild
 • \`/rpg-guild-info [guild-name]\` - View guild details
@@ -933,6 +940,266 @@ The guild is in good hands. Thank you for your leadership, **${result.oldLeader}
     console.error('Guild transfer command error:', error);
     return {
       text: `❌ Failed to transfer leadership: ${error.message}`,
+      response_type: 'ephemeral'
+    };
+  }
+}
+
+// Interactive Component Handler
+
+async function handleInteractiveComponent(payload, res) {
+  try {
+    console.log('Interactive component received:', payload.type);
+    
+    if (payload.type === 'view_submission') {
+      if (payload.view.callback_id === 'guild_create_modal') {
+        return await handleGuildCreateSubmission(payload, res);
+      }
+    }
+    
+    return res.status(200).json({});
+    
+  } catch (error) {
+    console.error('Interactive component error:', error);
+    return res.status(200).json({});
+  }
+}
+
+async function handleGuildCreateSubmission(payload, res) {
+  try {
+    const userId = payload.user.id;
+    const values = payload.view.state.values;
+    
+    // Extract form values
+    const channelId = values.channel_block.channel_select.selected_channel;
+    const guildName = values.name_block.guild_name_input.value;
+    const componentsInput = values.components_block.components_input.value || '';
+    const labelsInput = values.labels_block.labels_input.value || '';
+    
+    // Parse components and labels
+    const components = componentsInput 
+      ? componentsInput.split(',').map(c => c.trim()).filter(c => c)
+      : [];
+    const labels = labelsInput 
+      ? labelsInput.split(',').map(l => l.trim()).filter(l => l)
+      : [];
+    
+    // Validate at least one component or label
+    if (components.length === 0 && labels.length === 0) {
+      return res.status(200).json({
+        response_action: 'errors',
+        errors: {
+          components_block: 'Must specify at least one component or label',
+          labels_block: 'Must specify at least one component or label'
+        }
+      });
+    }
+    
+    // Get channel info for validation
+    const channelValidation = await validateSlackChannel(channelId);
+    
+    if (!channelValidation.isValid) {
+      return res.status(200).json({
+        response_action: 'errors',
+        errors: {
+          channel_block: channelValidation.message
+        }
+      });
+    }
+    
+    if (!channelValidation.channel.isMember) {
+      return res.status(200).json({
+        response_action: 'errors',
+        errors: {
+          channel_block: `Bot is not a member of #${channelValidation.channel.name}. Please invite the bot first.`
+        }
+      });
+    }
+    
+    // Create guild
+    const guild = await createGuild(
+      userId,
+      channelId,
+      channelValidation.channel.name,
+      guildName,
+      components,
+      labels
+    );
+    
+    // Post success message to the channel where the command was triggered
+    const successMessage = `🏰 **Guild Created Successfully!**
+
+⚔️ **${guild.name}** has been established!
+📍 **Channel:** <#${guild.slackChannelId}>
+👑 **Leader:** <@${userId}>
+
+🎯 **JIRA Components:** ${guild.jiraComponents.join(', ') || 'None'}
+🏷️ **JIRA Labels:** ${guild.jiraLabels.join(', ') || 'None'}
+
+Guild members will receive epic stories when working on tickets matching these components or labels!
+
+Use \`/rpg-guild-join ${guild.name}\` to invite others to join your guild! ⚔️`;
+
+    // Post message using response_url if available
+    if (payload.response_url) {
+      await fetch(payload.response_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: successMessage,
+          response_type: 'in_channel'
+        })
+      });
+    }
+    
+    return res.status(200).json({
+      response_action: 'clear'
+    });
+    
+  } catch (error) {
+    console.error('Guild creation submission error:', error);
+    return res.status(200).json({
+      response_action: 'errors',
+      errors: {
+        name_block: `Failed to create guild: ${error.message}`
+      }
+    });
+  }
+}
+
+// Modal Command Handlers
+
+async function handleGuildCreateModalCommand(triggerId) {
+  try {
+    const modal = {
+      type: 'modal',
+      callback_id: 'guild_create_modal',
+      title: {
+        type: 'plain_text',
+        text: 'Create New Guild'
+      },
+      submit: {
+        type: 'plain_text',
+        text: 'Create Guild'
+      },
+      close: {
+        type: 'plain_text',
+        text: 'Cancel'
+      },
+      blocks: [
+        {
+          type: 'input',
+          block_id: 'channel_block',
+          element: {
+            type: 'channels_select',
+            action_id: 'channel_select',
+            placeholder: {
+              type: 'plain_text',
+              text: 'Select channel for guild stories'
+            }
+          },
+          label: {
+            type: 'plain_text',
+            text: 'Guild Channel'
+          }
+        },
+        {
+          type: 'input',
+          block_id: 'name_block',
+          element: {
+            type: 'plain_text_input',
+            action_id: 'guild_name_input',
+            placeholder: {
+              type: 'plain_text',
+              text: 'e.g., Frontend Warriors'
+            },
+            max_length: 100
+          },
+          label: {
+            type: 'plain_text',
+            text: 'Guild Name'
+          }
+        },
+        {
+          type: 'input',
+          block_id: 'components_block',
+          element: {
+            type: 'plain_text_input',
+            action_id: 'components_input',
+            placeholder: {
+              type: 'plain_text',
+              text: 'UI,React,Frontend'
+            },
+            max_length: 200
+          },
+          label: {
+            type: 'plain_text',
+            text: 'JIRA Components (optional)'
+          },
+          optional: true
+        },
+        {
+          type: 'input',
+          block_id: 'labels_block',
+          element: {
+            type: 'plain_text_input',
+            action_id: 'labels_input',
+            placeholder: {
+              type: 'plain_text',
+              text: 'frontend,ui-bug,mobile'
+            },
+            max_length: 200
+          },
+          label: {
+            type: 'plain_text',
+            text: 'JIRA Labels (optional)'
+          },
+          optional: true
+        },
+        {
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: '💡 *Tip: Specify at least one component or label. Stories will be routed to your guild channel when JIRA tickets match these criteria.*'
+            }
+          ]
+        }
+      ]
+    };
+
+    // Open the modal
+    const response = await fetch('https://slack.com/api/views.open', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        trigger_id: triggerId,
+        view: modal
+      })
+    });
+
+    const result = await response.json();
+    
+    if (!result.ok) {
+      console.error('Failed to open modal:', result);
+      return {
+        text: '❌ Failed to open guild creation form. Please try again.',
+        response_type: 'ephemeral'
+      };
+    }
+
+    return {
+      text: '🏰 Opening guild creation form...',
+      response_type: 'ephemeral'
+    };
+
+  } catch (error) {
+    console.error('Guild create modal error:', error);
+    return {
+      text: '❌ Failed to open guild creation form. Please try again.',
       response_type: 'ephemeral'
     };
   }
