@@ -167,9 +167,6 @@ Once registered, you'll start earning XP and leveling up! 🗡️`,
 📈 Progress to Level ${userData.level + 1}: ${progressToNext.current}/${progressToNext.needed} XP (${progressToNext.percentage}%)
 
 🏰 **Guilds:** ${userData.guilds?.join(', ') || 'None'}
-⚔️ **Total Quests:** ${userData.totalTickets || 0}
-🐛 **Bugs Slain:** ${userData.totalBugs || 0}
-🕐 **Last Quest:** ${userData.lastActivity ? new Date(userData.lastActivity.seconds * 1000).toLocaleDateString() : 'Never'}
 
 Keep completing tickets to level up! 🌟`;
 
