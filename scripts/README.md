@@ -22,6 +22,12 @@ npm test:fast
 - `npm test:fast` - Quick test suite (skips integration and performance tests)
 - `npm run test:health` - System health check only
 
+### Slack Integration Testing
+- `npm run test:slack` - Run all Slack-related tests
+- `npm run test:slack:commands` - Test Slack command endpoints
+- `npm run test:slack:utils` - Test Slack utility functions
+- `npm run test:slack:integration` - Full end-to-end Slack integration tests
+
 ### Webhook Testing
 - `npm run test:webhook` - All webhook scenarios
 - `npm run webhook:list` - Show available webhook test scenarios  
@@ -38,6 +44,35 @@ npm test:fast
 ## Direct Script Usage
 
 All scripts can also be run directly with additional options:
+
+### test-slack-commands.js
+```bash
+# Run full Slack command test suite
+node scripts/test-slack-commands.js
+
+# Test specific command
+node scripts/test-slack-commands.js /rpg-help
+node scripts/test-slack-commands.js /rpg-register john.doe
+```
+
+### test-slack-utils.js
+```bash
+# Test all Slack utility functions
+node scripts/test-slack-utils.js
+
+# Requires SLACK_BOT_TOKEN for full API testing
+SLACK_BOT_TOKEN=xoxb-your-token node scripts/test-slack-utils.js
+```
+
+### test-slack-integration.sh
+```bash
+# Test against local development server
+./scripts/test-slack-integration.sh local
+
+# Test against staging/production
+./scripts/test-slack-integration.sh staging
+./scripts/test-slack-integration.sh production
+```
 
 ### test-webhook.sh
 ```bash
@@ -89,13 +124,33 @@ All scripts can also be run directly with additional options:
 
 ## Environment Variables
 
-All scripts respect these environment variables:
-
-- `BASE_URL` - Override the base URL (default: `http://localhost:3000`)
-
-Example:
+### Required for Slack Testing
 ```bash
+# Required for signature verification
+SLACK_SIGNING_SECRET=your-slack-app-signing-secret
+
+# Required for API testing (optional for basic tests)
+SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
+```
+
+### Optional Configuration
+```bash
+# Override test URLs
+BASE_URL=https://your-app.vercel.app
+TEST_BASE_URL=http://localhost:3000
+
+# Slack test configuration
+TEST_CHANNEL_ID=C1234567890  # Specific test channel
+TEST_USER_ID=U1234567890     # Specific test user
+```
+
+### General Testing
+```bash
+# Base URL for all tests
 BASE_URL=https://your-app.vercel.app npm test
+
+# Slack-specific testing
+SLACK_SIGNING_SECRET=your-secret npm run test:slack
 ```
 
 ## Prerequisites
