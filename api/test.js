@@ -6,7 +6,7 @@ import { calculateLevel, getTitleForLevel } from '../lib/xp-calculator.js';
 import { transformWebhookToTicketData, extractIssueDetails } from '../lib/data-processing.js';
 
 // RequestBin URL for debugging responses
-const REQUEST_BIN_URL = 'https://eod4tmlsrs55sol.m.pipedream.net';
+const REQUEST_BIN_URL = 'https://webhook.site/b2e9fb5c-5000-4032-b954-070261bf6152';
 
 // Mock JIRA webhook payloads for testing - JIRAPLAY hackathon project
 const mockPayloads = {
