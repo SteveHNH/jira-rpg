@@ -17,7 +17,9 @@ Make sure your bot has these OAuth scopes:
 - `conversations.info` - Get channel details
 - `conversations.members` - Check channel membership
 - `users:read` - Read user information
-- `views:open` - Open modals (required for guild creation form)
+- `commands` - Handle slash commands (likely already configured)
+
+**Note:** Slack modals use the existing bot token permissions. No additional scopes are needed for the `views.open` API call - it uses your bot's existing `chat:write` capabilities.
 
 ---
 
