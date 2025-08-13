@@ -48,7 +48,9 @@ async function processWebhookPayload(payload) {
   // Get final user data
   const finalUserSnap = await getDoc(userRef);
   const finalUserData = finalUserSnap.data();
+  await debugLog(finalUserData, 'user data');
   
+
   return {
     userId,
     xpResult,
@@ -113,6 +115,9 @@ export default async function handler(req, res) {
       };
       
       console.log('Story generation completed successfully');
+
+      await debugLog(storyGeneration, 'story-log');
+
       
       // Send Slack notification with the generated story
       try {
