@@ -1,6 +1,6 @@
 // api/slack-commands.js - Slack slash command handler
 
-import { verifySlackRequest } from '../lib/slack.js';
+import { verifySlackRequest, getUserInfo } from '../lib/slack.js';
 import { db } from '../lib/firebase.js';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { createUser, getUserBySlackId } from '../lib/user-service.js';
@@ -247,15 +247,15 @@ Once registered, you'll start earning XP and leveling up! 🗡️`,
       guildNames = resolvedGuildNames.join(', ');
     }
     
-    const statusText = `🏆 **${userName}** *(${userData.currentTitle})*
+    const statusText = `🏆 *@${userName}* _(${userData.currentTitle})_
 
-📊 **Level ${userData.level}** | **${userData.xp} XP**
+📊 *Level ${userData.level}* | *${userData.xp} XP*
 📈 Progress to Level ${userData.level + 1}: ${progressToNext.current}/${progressToNext.needed} XP (${progressToNext.percentage}%)
 
-🏰 **Guilds:** ${guildNames}
-⚔️ **Total Quests:** ${userData.totalTickets || 0}
-🐛 **Bugs Slain:** ${userData.totalBugs || 0}
-🕐 **Last Quest:** ${userData.lastActivity ? new Date(userData.lastActivity.seconds * 1000).toLocaleDateString() : 'Never'}
+🏰 *Guilds:* ${guildNames}
+⚔️ *Total Quests:* ${userData.totalTickets || 0}
+🐛 *Bugs Slain:* ${userData.totalBugs || 0}
+🕐 *Last Quest:* ${userData.lastActivity ? new Date(userData.lastActivity.seconds * 1000).toLocaleDateString() : 'Never'}
 
 Keep completing tickets to level up! 🌟`;
 
