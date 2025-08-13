@@ -3,7 +3,7 @@
 import { verifySlackRequest } from '../lib/slack.js';
 import { db } from '../lib/firebase.js';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { createUser } from '../lib/user-service.js';
+import { createUser, getUserBySlackId } from '../lib/user-service.js';
 import { validateSlackChannel, validateCommandContext } from '../lib/slack-service.js';
 import { 
   createGuild,
@@ -767,8 +767,16 @@ async function handleGuildRenameCommand(userId, text, channelId) {
       currentGuildName = context.guild.name;
     } else {
       // In DM, need to determine which guild to rename
+      const user = await getUserBySlackId(userId);
+      if (!user) {
+        return {
+          text: '❌ User not found in RPG system.',
+          response_type: 'ephemeral'
+        };
+      }
+      
       const userGuilds = await getGuildsByUser(userId);
-      const leaderGuilds = userGuilds.filter(guild => guild.leaderId === (await import('../lib/user-service.js')).getUserBySlackId(userId).then(user => user?.jiraUsername));
+      const leaderGuilds = userGuilds.filter(guild => guild.leaderId === user.jiraUsername);
       
       if (leaderGuilds.length === 0) {
         return {
