@@ -3,6 +3,7 @@
 import { verifySlackRequest } from '../lib/slack.js';
 import { db } from '../lib/firebase.js';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { createUser } from '../lib/user-service.js';
 
 export default async function handler(req, res) {
   console.log('Slack command received:', {
@@ -203,13 +204,36 @@ async function handleRegisterCommand(userId, userName, email) {
     };
   }
   
-  // TODO: Implement user registration logic
-  // This would link the Slack user ID to a JIRA email
-  
-  return {
-    text: `✅ Registration coming soon! For now, complete a JIRA ticket and you'll be automatically registered with email **${email.trim()}**.`,
-    response_type: 'ephemeral'
-  };
+  try {
+    const trimmedEmail = email.trim();
+    const newUser = await createUser(userId, userName, trimmedEmail);
+    
+    return {
+      text: `🎉 **Welcome to the RPG, ${userName}!**
+
+🗡️ You've been registered with email: **${trimmedEmail}**
+📊 Starting Level: **1** (Novice Adventurer)
+⚔️ Current XP: **0**
+
+Complete JIRA tickets to start earning XP and leveling up! Your epic coding adventures await! 🌟`,
+      response_type: 'ephemeral'
+    };
+    
+  } catch (error) {
+    console.error('Registration error:', error);
+    
+    if (error.message.includes('already registered')) {
+      return {
+        text: `⚠️ ${error.message}. Use \`/rpg-status\` to check your current progress!`,
+        response_type: 'ephemeral'
+      };
+    }
+    
+    return {
+      text: '❌ Registration failed. Please try again later or contact an admin.',
+      response_type: 'ephemeral'
+    };
+  }
 }
 
 async function handleLeaderboardCommand(channelId) {
