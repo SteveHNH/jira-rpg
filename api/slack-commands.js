@@ -247,7 +247,7 @@ Once registered, you'll start earning XP and leveling up! 🗡️`,
       guildNames = resolvedGuildNames.join(', ');
     }
     
-    const statusText = `🏆 *@${userName}* _(${userData.currentTitle})_
+    const statusText = `🏆 @${userName} _(${userData.currentTitle})_
 
 📊 *Level ${userData.level}* | *${userData.xp} XP*
 📈 Progress to Level ${userData.level + 1}: ${progressToNext.current}/${progressToNext.needed} XP (${progressToNext.percentage}%)
