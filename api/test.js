@@ -1,6 +1,8 @@
 import { db } from '../lib/firebase.js';
-import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { testStoryGeneration, checkOllamaHealth, extractGuildInfo } from '../lib/story-generator.js';
+import { awardXpFromWebhook, getUserBySlackId } from '../lib/user-service.js';
+import { calculateLevel, getTitleForLevel } from '../lib/xp-calculator.js';
 
 // RequestBin URL for debugging responses
 const REQUEST_BIN_URL = 'https://eod4tmlsrs55sol.m.pipedream.net';
@@ -147,7 +149,7 @@ function transformWebhookToTicketData(payload) {
   };
 }
 
-// Process webhook payload (reusing logic from webhook.js)
+// Process webhook payload with proper XP calculation
 async function processWebhookPayload(payload) {
   const { issue, user } = payload;
   
@@ -173,7 +175,7 @@ async function processWebhookPayload(payload) {
       displayName: user.displayName || user.name || userId,
       xp: 0,
       level: 1,
-      currentTitle: "Novice Adventurer",
+      currentTitle: getTitleForLevel(1),
       joinedAt: new Date(),
       lastActivity: new Date()
     };
@@ -182,24 +184,20 @@ async function processWebhookPayload(payload) {
     userData = userSnap.data();
   }
   
-  // Award XP (simplified - just give 50 XP for any webhook)
-  const xpAwarded = 50;
-  await updateDoc(userRef, {
-    xp: increment(xpAwarded),
-    lastActivity: new Date()
-  });
+  // Award XP using new dynamic calculation system
+  const xpResult = await awardXpFromWebhook(userId, payload);
   
-  // Get updated user data
-  const updatedUserSnap = await getDoc(userRef);
-  const updatedUserData = updatedUserSnap.data();
+  // Get final user data
+  const finalUserSnap = await getDoc(userRef);
+  const finalUserData = finalUserSnap.data();
   
   return {
     userId,
-    xpAwarded,
+    xpResult,
     userStats: {
-      totalXp: updatedUserData.xp,
-      level: updatedUserData.level,
-      title: updatedUserData.currentTitle
+      totalXp: finalUserData.xp,
+      level: finalUserData.level,
+      title: finalUserData.currentTitle
     },
     issueDetails
   };
@@ -291,9 +289,14 @@ export default async function handler(req, res) {
         message: 'Test webhook processed successfully',
         processingDetails: {
           userAffected: result.userId,
-          eventType: result.eventType,
-          issueKey: result.issueKey,
-          xpAwarded: result.xpAwarded,
+          xpAwarded: result.xpResult.xpAwarded,
+          xpReason: result.xpResult.reason,
+          levelUp: result.xpResult.leveledUp ? {
+            oldLevel: result.xpResult.oldLevel,
+            newLevel: result.xpResult.newLevel,
+            oldTitle: result.xpResult.oldTitle,
+            newTitle: result.xpResult.newTitle
+          } : null,
           userStats: result.userStats
         },
         issueDetails: result.issueDetails,
