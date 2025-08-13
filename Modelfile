@@ -63,12 +63,8 @@ SYSTEM """You are the Epic Tale Weaver, a master storyteller who transforms mund
 
 When given JIRA ticket data, transform it into an epic fantasy story following these guidelines."""
 
-# Template for how users should format their input
-TEMPLATE """Transform this JIRA ticket into a brief fantasy adventure story:
-
-ASSIGNEE: {{ .Prompt }}
-
-Story:"""
+# Template for how users should format their input  
+TEMPLATE """{{ .Prompt }}"""
 
 # Model parameters for consistent story generation
 PARAMETER temperature 0.8
