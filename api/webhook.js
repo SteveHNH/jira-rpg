@@ -1,6 +1,6 @@
 import { db } from '../lib/firebase.js';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { testStoryGeneration, checkOllamaHealth, extractGuildInfo } from '../lib/story-generator.js';
+import { testStoryGeneration, checkOllamaHealth, extractGuildInfo, routeStoryToGuilds } from '../lib/story-generator.js';
 import { sendStoryNotification } from '../lib/slack-service.js';
 import { awardXpFromWebhook } from '../lib/user-service.js';
 import { getTitleForLevel } from '../lib/xp-calculator.js';
@@ -100,66 +100,141 @@ export default async function handler(req, res) {
     // Process the webhook payload
     const result = await processWebhookPayload(payload);
     
-    // Generate story from the JIRA payload
-    let storyGeneration = null;
-    let slackNotification = null;
+    // NEW: Guild-aware story routing
+    let guildRoutingResult = null;
+    let dmNotification = null;
+    
     try {
-      console.log('Generating fantasy story for issue:', result.issueDetails.issueKey);
+      console.log('Starting guild-aware story routing for issue:', result.issueDetails.issueKey);
       
-      // Transform webhook payload to ticket data format
-      const ticketData = transformWebhookToTicketData(payload);
-      await debugLog(ticketData, 'ticket-reansformation');
-      console.log('Transformed ticket data:', ticketData);
+      // Route story to matching guild channels
+      guildRoutingResult = await routeStoryToGuilds(payload);
+      await debugLog(guildRoutingResult, 'guild-routing-result');
       
-      const [ollamaHealth, guildInfo, storyResult] = await Promise.all([
-        checkOllamaHealth(),
-        extractGuildInfo(payload.issue),
-        testStoryGeneration(ticketData)
-      ]);
-      
-      storyGeneration = {
-        narrative: storyResult,
-        guildInfo: guildInfo,
-        ollamaHealth: ollamaHealth,
-        ticketData: ticketData,
-        xpAward: result.xpResult,
-        timestamp: new Date().toISOString()
-      };
-      
-      console.log('Story generation completed successfully');
+      console.log('Guild routing completed:', {
+        routedChannels: guildRoutingResult.routedChannels,
+        matchingGuilds: guildRoutingResult.matchingGuilds,
+        success: guildRoutingResult.success
+      });
 
-      await debugLog(storyGeneration, 'story-log');
-
+      // Fallback to DM if no guild routing occurred
+      if (guildRoutingResult.routedChannels === 0) {
+        console.log('No guilds matched, sending DM notification as fallback');
+        
+        try {
+          const ticketInfo = {
+            issueKey: result.issueDetails.issueKey,
+            issueUrl: result.issueDetails.issueUrl,
+            summary: result.issueDetails.summary
+          };
+          
+          // Generate individual story for DM (since no guild routing happened)
+          const ticketData = transformWebhookToTicketData(payload);
+          const [ollamaHealth, guildInfo, storyResult] = await Promise.all([
+            checkOllamaHealth(),
+            extractGuildInfo(payload.issue),
+            testStoryGeneration(ticketData)
+          ]);
+          
+          const storyGeneration = {
+            narrative: storyResult,
+            guildInfo: guildInfo,
+            ollamaHealth: ollamaHealth,
+            ticketData: ticketData,
+            xpAward: result.xpResult,
+            timestamp: new Date().toISOString()
+          };
+          
+          dmNotification = await sendStoryNotification(
+            storyGeneration,
+            ticketInfo,
+            payload.user
+          );
+          
+          console.log('DM notification result:', dmNotification);
+        } catch (dmError) {
+          console.error('DM notification failed:', dmError);
+          dmNotification = {
+            success: false,
+            error: dmError.message
+          };
+        }
+      } else {
+        // Guild routing succeeded, also send DM as backup
+        console.log('Guild routing successful, sending additional DM notification');
+        
+        try {
+          const ticketInfo = {
+            issueKey: result.issueDetails.issueKey,
+            issueUrl: result.issueDetails.issueUrl,
+            summary: result.issueDetails.summary
+          };
+          
+          // Use the same story data from guild routing for DM
+          if (guildRoutingResult.storyData) {
+            dmNotification = await sendStoryNotification(
+              guildRoutingResult.storyData,
+              ticketInfo,
+              payload.user
+            );
+            console.log('Additional DM notification sent:', dmNotification);
+          }
+        } catch (dmError) {
+          console.error('Additional DM notification failed (non-critical):', dmError);
+          dmNotification = {
+            success: false,
+            error: dmError.message
+          };
+        }
+      }
       
-      // Send Slack notification with the generated story
+    } catch (routingError) {
+      console.error('Guild routing failed, falling back to DM only:', routingError);
+      
+      // Critical fallback: Always ensure user gets story via DM
       try {
-        console.log('Sending Slack notification for story...');
         const ticketInfo = {
           issueKey: result.issueDetails.issueKey,
           issueUrl: result.issueDetails.issueUrl,
           summary: result.issueDetails.summary
         };
         
-        slackNotification = await sendStoryNotification(
+        // Generate story for fallback DM
+        const ticketData = transformWebhookToTicketData(payload);
+        const [ollamaHealth, guildInfo, storyResult] = await Promise.all([
+          checkOllamaHealth(),
+          extractGuildInfo(payload.issue),
+          testStoryGeneration(ticketData)
+        ]);
+        
+        const storyGeneration = {
+          narrative: storyResult,
+          guildInfo: guildInfo,
+          ollamaHealth: ollamaHealth,
+          ticketData: ticketData,
+          xpAward: result.xpResult,
+          timestamp: new Date().toISOString()
+        };
+        
+        dmNotification = await sendStoryNotification(
           storyGeneration,
           ticketInfo,
           payload.user
         );
         
-        console.log('Slack notification result:', slackNotification);
-      } catch (slackError) {
-        console.error('Slack notification failed:', slackError);
-        slackNotification = {
+        console.log('Fallback DM notification sent:', dmNotification);
+      } catch (fallbackError) {
+        console.error('Even fallback DM failed:', fallbackError);
+        dmNotification = {
           success: false,
-          error: slackError.message
+          error: fallbackError.message
         };
       }
-    } catch (storyError) {
-      console.error('Story generation failed:', storyError);
-      storyGeneration = {
-        error: 'Story generation failed',
-        message: storyError.message,
-        timestamp: new Date().toISOString()
+      
+      guildRoutingResult = {
+        success: false,
+        error: routingError.message,
+        routedChannels: 0
       };
     }
     
@@ -179,8 +254,8 @@ export default async function handler(req, res) {
         userStats: result.userStats
       },
       issueDetails: result.issueDetails,
-      storyGeneration: storyGeneration,
-      slackNotification: slackNotification
+      guildRouting: guildRoutingResult,
+      dmNotification: dmNotification
     };
     
     console.log('Production webhook processed successfully');

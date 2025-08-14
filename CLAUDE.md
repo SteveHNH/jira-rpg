@@ -173,10 +173,53 @@ jira-rpg/
 }
 ```
 
-#### Story Routing Enhancement
-- Automatic routing to guild channels based on JIRA ticket components/labels
-- Duplicate prevention when multiple guilds match same channel
-- Enhanced stories with guild context and branding
+#### Channel Routing for Guild Stories (Session: 2025-08-14)
+- **Purpose**: Automated story delivery to guild channels based on JIRA ticket metadata
+- **Location**: Enhanced `api/webhook.js`, `lib/story-generator.js`
+- **Key Features**:
+  - Smart guild matching using JIRA components and labels
+  - Multi-guild routing with duplicate prevention
+  - Robust fallback system ensuring DM delivery
+  - Guild-contextualized stories with enhanced formatting
+  - Comprehensive error handling and logging
+
+#### Channel Routing Flow
+```javascript
+// Enhanced webhook processing flow:
+1. Webhook Received → Process User & XP
+2. Extract Components/Labels → Find Matching Guilds
+3. Generate Stories → Route to Guild Channels  
+4. Fallback to DM → Ensure User Notification
+5. Debug Logging → Track Routing Results
+```
+
+#### Story Routing Logic
+- **Guild Matching**: `guild.jiraComponents ∩ ticket.components` OR `guild.jiraLabels ∩ ticket.labels`
+- **Channel Deduplication**: Same story not sent twice to same channel ID
+- **Error Resilience**: Multiple fallback layers prevent webhook failures
+- **Guild Context**: Stories enhanced with guild branding and member context
+
+#### Enhanced Webhook Response
+```javascript
+{
+  "guildRouting": {
+    "success": true,
+    "routedChannels": 2,        // Unique channels messaged
+    "matchingGuilds": 3,        // Total guilds matched
+    "results": [                // Per-guild results
+      {
+        "guild": "Frontend Warriors",
+        "channelId": "C123456",
+        "success": true
+      }
+    ]
+  },
+  "dmNotification": {           // User DM fallback
+    "success": true,
+    "slackUserId": "U123456"
+  }
+}
+```
 
 #### Status Display Improvements
 - Fixed `/rpg-status` to show guild names instead of IDs
@@ -186,14 +229,16 @@ jira-rpg/
 
 ### 🔧 Development Tools Created
 - **JIRA Testing Directory**: `jira-testing/` with API scripts
-- **Test Scripts**: `test-webhook.sh` for endpoint testing
-- **Documentation**: `test.md` with testing instructions, `slack-commands.md` for bot configuration
+- **Test Scripts**: `test-webhook.sh`, `test-guild-routing.sh` for comprehensive testing
+- **Mock Data**: `mock-guild-tickets.json` with 5 routing scenarios
+- **Documentation**: `test.md`, `guild-routing-tests.md`, `slack-commands.md` for testing and configuration
 - **Planning**: `plan.md` with implementation details
 
 ### 🎯 Next Steps
-- Deploy guild system features to production
-- Test story routing with real JIRA webhooks
-- Implement achievement system
-- Add guild statistics and leaderboards
+- Deploy channel routing to production
+- Test with real JIRA webhooks and guild scenarios  
+- Monitor routing success rates and user engagement
+- Implement guild achievements and competitions
+- Add guild statistics and analytics dashboard
 
 - Always create a plan.md when we start a feature request
