@@ -205,6 +205,7 @@ export default async function handler(req, res) {
           guildInfo: guildInfo,
           ollamaHealth: ollamaHealth,
           ticketData: ticketData, // Include transformed data for debugging
+          xpAward: result.xpResult,
           timestamp: new Date().toISOString()
         };
         
