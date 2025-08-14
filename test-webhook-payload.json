@@ -1,0 +1,117 @@
+{
+  "timestamp": 1755138036160,
+  "webhookEvent": "jira:issue_updated", 
+  "issue_event_type_name": "issue_updated",
+  "user": {
+    "self": null,
+    "name": "712020:21d709a7-0edc-4bf3-a453-629ba20fbfd1",
+    "key": "712020:21d709a7-0edc-4bf3-a453-629ba20fbfd1",
+    "accountId": "712020:21d709a7-0edc-4bf3-a453-629ba20fbfd1",
+    "emailAddress": "thatstephenadams@gmail.com",
+    "displayName": "Stephen Adams",
+    "active": true,
+    "timeZone": null,
+    "groups": null,
+    "locale": "en_US",
+    "accountType": "atlassian"
+  },
+  "issue": {
+    "id": 10045,
+    "key": "ECS-22",
+    "self": "https://rpg-jira.atlassian.net/rest/api/2/10045",
+    "fields": {
+      "summary": "Implement user authentication system",
+      "description": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "Create a secure user authentication system with login, logout, and session management functionality."
+              }
+            ]
+          }
+        ]
+      },
+      "issuetype": {
+        "self": "https://rpg-jira.atlassian.net/rest/api/2/issuetype/1",
+        "id": "1",
+        "name": "Story",
+        "subtask": false
+      },
+      "project": {
+        "self": "https://rpg-jira.atlassian.net/rest/api/2/project/10000",
+        "id": "10000",
+        "key": "ECS",
+        "name": "E-Commerce System"
+      },
+      "priority": {
+        "self": "https://rpg-jira.atlassian.net/rest/api/2/priority/3",
+        "id": "3",
+        "name": "Medium"
+      },
+      "status": {
+        "self": "https://rpg-jira.atlassian.net/rest/api/2/status/3",
+        "id": "3",
+        "name": "In Progress",
+        "statusCategory": {
+          "self": "https://rpg-jira.atlassian.net/rest/api/2/statuscategory/4",
+          "id": 4,
+          "key": "indeterminate",
+          "colorName": "yellow",
+          "name": "In Progress"
+        }
+      },
+      "assignee": {
+        "self": "https://rpg-jira.atlassian.net/rest/api/2/user?accountId=712020:21d709a7-0edc-4bf3-a453-629ba20fbfd1",
+        "accountId": "712020:21d709a7-0edc-4bf3-a453-629ba20fbfd1",
+        "name": "712020:21d709a7-0edc-4bf3-a453-629ba20fbfd1",
+        "key": "712020:21d709a7-0edc-4bf3-a453-629ba20fbfd1",
+        "emailAddress": "thatstephenadams@gmail.com",
+        "displayName": "Stephen Adams",
+        "active": true
+      },
+      "reporter": {
+        "self": "https://rpg-jira.atlassian.net/rest/api/2/user?accountId=712020:21d709a7-0edc-4bf3-a453-629ba20fbfd1",
+        "accountId": "712020:21d709a7-0edc-4bf3-a453-629ba20fbfd1",
+        "name": "712020:21d709a7-0edc-4bf3-a453-629ba20fbfd1",
+        "key": "712020:21d709a7-0edc-4bf3-a453-629ba20fbfd1",
+        "emailAddress": "thatstephenadams@gmail.com",
+        "displayName": "Stephen Adams",
+        "active": true
+      },
+      "components": [
+        {
+          "self": "https://rpg-jira.atlassian.net/rest/api/2/component/10000",
+          "id": "10000",
+          "name": "Backend"
+        },
+        {
+          "self": "https://rpg-jira.atlassian.net/rest/api/2/component/10001",
+          "id": "10001", 
+          "name": "Security"
+        }
+      ],
+      "labels": ["authentication", "security", "backend"],
+      "created": "2025-01-13T10:00:00.000+0000",
+      "updated": "2025-01-13T15:30:00.000+0000",
+      "customfield_10016": 5
+    }
+  },
+  "changelog": {
+    "id": "12345",
+    "items": [
+      {
+        "field": "status",
+        "fieldtype": "jira",
+        "from": "10000",
+        "fromString": "To Do",
+        "to": "3",
+        "toString": "In Progress"
+      }
+    ]
+  }
+}

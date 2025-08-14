@@ -122,6 +122,7 @@ export default async function handler(req, res) {
         guildInfo: guildInfo,
         ollamaHealth: ollamaHealth,
         ticketData: ticketData,
+        xpAward: result.xpResult,
         timestamp: new Date().toISOString()
       };
       
