@@ -16,7 +16,17 @@ const mockPayloads = {
     issue: {
       key: 'JIRAPLAY-123',
       fields: {
-        summary: 'Hackathon test issue moved to In Progress',
+        summary: 'Fix mobile login button responsiveness',
+        description: {
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Users are reporting that the login button on mobile devices is unresponsive. The button appears but does not react to touch events. This is affecting user authentication flow on mobile platforms.'
+            }]
+          }]
+        },
         issuetype: { name: 'Story' },
         priority: { name: 'Medium' },
         status: { name: 'In Progress' },
@@ -50,7 +60,17 @@ const mockPayloads = {
     issue: {
       key: 'JIRAPLAY-124',
       fields: {
-        summary: 'Hackathon test issue completed',
+        summary: 'Implement user dashboard analytics widget',
+        description: {
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Create an analytics widget for the user dashboard that displays key metrics including page views, user engagement, and conversion rates. The widget should be responsive and update in real-time with interactive charts and data visualization.'
+            }]
+          }]
+        },
         issuetype: { name: 'Story' },
         priority: { name: 'High' },
         status: { name: 'Done' },
