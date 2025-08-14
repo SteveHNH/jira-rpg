@@ -126,10 +126,74 @@ jira-rpg/
 - **Documentation**: `test.md` with testing instructions
 - **Planning**: `plan.md` with implementation details
 
+#### Guild System (Session: 2025-08-13)
+- **Purpose**: Complete guild management system with Slack integration and JIRA component/label mapping
+- **Location**: `lib/guild-service.js`, enhanced `api/slack-commands.js`, `lib/slack-service.js`, `lib/story-generator.js`
+- **Key Features**:
+  - Modal-based guild creation with channel validation
+  - JIRA component/label mapping for automatic story routing
+  - Multiple guild membership support with leadership management
+  - Story routing with duplicate prevention to guild channels
+  - Interactive Slack modal forms replacing complex command parsing
+
+#### Guild Slack Commands
+```
+/rpg-guild-create          # Opens modal form for guild creation
+/rpg-guild-list           # List all available guilds
+/rpg-guild-join <name>    # Join existing guild
+/rpg-guild-leave [name]   # Leave guild
+/rpg-guild-info [name]    # View guild details
+/rpg-guild-rename <name>  # Rename guild (leader only)
+/rpg-guild-kick <@user>   # Remove member (leader only)
+/rpg-guild-transfer <@user> # Transfer leadership (leader only)
+```
+
+#### Guild Data Structure
+```javascript
+// Guilds Collection
+{
+  name: "Frontend Warriors",
+  slackChannelId: "C123456",
+  slackChannelName: "dev-frontend", 
+  leaderId: "user@company.com",
+  jiraComponents: ["UI", "React", "Frontend"],
+  jiraLabels: ["frontend", "ui-bug"],
+  members: [
+    {
+      email: "user@company.com",
+      slackUserId: "U123456",
+      displayName: "John Dev",
+      role: "leader" | "member",
+      joinedAt: Date
+    }
+  ],
+  totalXp: 5000,
+  averageLevel: 8.5,
+  isActive: true
+}
+```
+
+#### Story Routing Enhancement
+- Automatic routing to guild channels based on JIRA ticket components/labels
+- Duplicate prevention when multiple guilds match same channel
+- Enhanced stories with guild context and branding
+
+#### Status Display Improvements
+- Fixed `/rpg-status` to show guild names instead of IDs
+- Display @username format for recognition
+- Proper Slack markdown formatting
+- Enhanced quest statistics display
+
+### 🔧 Development Tools Created
+- **JIRA Testing Directory**: `jira-testing/` with API scripts
+- **Test Scripts**: `test-webhook.sh` for endpoint testing
+- **Documentation**: `test.md` with testing instructions, `slack-commands.md` for bot configuration
+- **Planning**: `plan.md` with implementation details
+
 ### 🎯 Next Steps
-- Deploy to Vercel for live webhook testing
-- Implement production webhook endpoint (`api/webhook.js`)
-- Add Slack bot integration (`api/slack-commands.js`)
-- Complete Firestore user management system
+- Deploy guild system features to production
+- Test story routing with real JIRA webhooks
+- Implement achievement system
+- Add guild statistics and leaderboards
 
 - Always create a plan.md when we start a feature request
