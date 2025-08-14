@@ -16,13 +16,17 @@ jira-rpg/
 ├── api/
 │   ├── webhook.js              # JIRA webhook receiver
 │   ├── slack-commands.js       # Slack slash commands
+│   ├── slack-events.js         # Slack Events API for DM conversations
 │   └── team-management.js      # Team creation/joining
 ├── lib/
 │   ├── firebase.js            # Firebase connection
 │   ├── story-generator.js     # Ollama AI integration
 │   ├── user-service.js        # User XP/level operations
 │   ├── slack-service.js       # Slack API helpers
-│   └── xp-calculator.js       # XP rules and leveling
+│   ├── xp-calculator.js       # XP rules and leveling
+│   ├── jira-client.js         # JIRA REST API client
+│   └── conversation-service.js # Conversational storytelling orchestration
+├── ConversationalModelfile     # Specialized Ollama model for DM conversations
 ```
 
 ## Key Slack Commands
@@ -68,6 +72,7 @@ jira-rpg/
 - OLLAMA_API_URL, OLLAMA_MODEL
 - SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET
 - JIRA_WEBHOOK_SECRET
+- JIRA_API_URL, JIRA_API_EMAIL, JIRA_API_TOKEN (for conversational feature)
 
 ## Implementation Status
 
@@ -227,17 +232,52 @@ jira-rpg/
 - Proper Slack markdown formatting
 - Enhanced quest statistics display
 
+#### Conversational JIRA Storytelling (Session: 2025-08-14)
+- **Purpose**: Natural language DM conversations about user's JIRA accomplishments
+- **Location**: `api/slack-events.js`, `lib/jira-client.js`, `lib/conversation-service.js`, `ConversationalModelfile`
+- **Key Features**:
+  - Direct message handling for non-slash command conversations
+  - JIRA REST API integration for fetching user's completed tickets
+  - Natural language processing for requests like "what did I do last month"
+  - Specialized conversational Ollama model for epic storytelling responses
+  - Smart ticket filtering and batching (max 10 tickets per request)
+
+#### Conversational Features
+- **Natural Language Queries**: "Tell me what I did last week", "Show me my last 5 tickets"
+- **JIRA Integration**: Fetches user tickets with date ranges, status filters, and project filtering
+- **Epic Storytelling**: Transforms dry ticket data into engaging fantasy narratives
+- **Smart Intent Parsing**: Extracts ticket count, date ranges, and status preferences from user messages
+- **Fallback Handling**: Graceful responses when no tickets found or errors occur
+
+#### Conversational Data Flow
+```javascript
+// DM conversation flow:
+1. User DM → Slack Events API → slack-events.js
+2. Parse Intent → Extract filters (date, count, status)
+3. JIRA API → Fetch relevant tickets
+4. Ollama Model → Generate epic story response
+5. Slack API → Send conversational response
+```
+
+#### Conversational Model Features
+- **Personality**: Enthusiastic coding companion using RPG/fantasy language
+- **Response Format**: JSON with message and ticket summary
+- **Adaptive**: Handles both ticket queries and general conversation
+- **Celebratory**: Turns coding work into heroic adventures and accomplishments
+
 ### 🔧 Development Tools Created
 - **JIRA Testing Directory**: `jira-testing/` with API scripts
-- **Test Scripts**: `test-webhook.sh`, `test-guild-routing.sh` for comprehensive testing
+- **Test Scripts**: `test-webhook.sh`, `test-guild-routing.sh`, `test-conversational.sh` for comprehensive testing
 - **Mock Data**: `mock-guild-tickets.json` with 5 routing scenarios
-- **Documentation**: `test.md`, `guild-routing-tests.md`, `slack-commands.md` for testing and configuration
+- **Documentation**: `test.md`, `guild-routing-tests.md`, `slack-commands.md`, `CONVERSATIONAL_SETUP.md` for testing and configuration
 - **Planning**: `plan.md` with implementation details
 
 ### 🎯 Next Steps
-- Deploy channel routing to production
-- Test with real JIRA webhooks and guild scenarios  
-- Monitor routing success rates and user engagement
+- Deploy conversational feature to production with JIRA API configuration
+- Build and deploy ConversationalModelfile to Ollama
+- Set up Slack Events API endpoint for DM message handling
+- Test conversational storytelling with real registered users
+- Monitor JIRA API usage and conversation engagement
 - Implement guild achievements and competitions
 - Add guild statistics and analytics dashboard
 
