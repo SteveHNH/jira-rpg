@@ -4,6 +4,19 @@ import crypto from 'crypto';
 import { getUserBySlackId } from '../lib/user-service.js';
 import { handleConversationalRequest } from '../lib/conversation-service.js';
 
+// Simple in-memory cache to prevent duplicate message processing
+const processedMessages = new Map();
+
+// Clean up old entries every 10 minutes
+setInterval(() => {
+  const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+  for (const [key, timestamp] of processedMessages.entries()) {
+    if (timestamp < tenMinutesAgo) {
+      processedMessages.delete(key);
+    }
+  }
+}, 10 * 60 * 1000);
+
 export default async function handler(req, res) {
   console.log('Slack event received:', {
     method: req.method,
@@ -40,9 +53,11 @@ export default async function handler(req, res) {
         hasText: !!event?.text
       });
 
-      // Only handle direct messages
+      // Only handle direct messages (async - don't wait for completion)
       if (event.type === 'message' && event.channel_type === 'im') {
-        await handleDirectMessage(event);
+        handleDirectMessage(event).catch(error => {
+          console.error('Async DM handling error:', error);
+        });
       }
 
       return res.status(200).json({ ok: true });
@@ -64,7 +79,7 @@ export default async function handler(req, res) {
  */
 async function handleDirectMessage(event) {
   try {
-    const { user, text, channel, bot_id, subtype } = event;
+    const { user, text, channel, ts, bot_id, subtype } = event;
 
     // Ignore bot messages and system messages
     if (bot_id || subtype || !text) {
@@ -77,6 +92,14 @@ async function handleDirectMessage(event) {
       console.log('Ignoring slash command:', text.substring(0, 20));
       return;
     }
+
+    // Prevent duplicate message processing
+    const messageKey = `${user}-${ts}`;
+    if (processedMessages.has(messageKey)) {
+      console.log('Ignoring duplicate message:', messageKey);
+      return;
+    }
+    processedMessages.set(messageKey, Date.now());
 
     console.log('Processing DM from user:', user, 'Text:', text.substring(0, 100));
 
