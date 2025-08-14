@@ -4,6 +4,7 @@ import { verifySlackRequest, getUserInfo } from '../lib/slack.js';
 import { db } from '../lib/firebase.js';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { createUser, getUserBySlackId } from '../lib/user-service.js';
+import { LEVEL_THRESHOLDS, getXpForLevel } from '../lib/xp-calculator.js';
 import { validateSlackChannel, validateCommandContext } from '../lib/slack-service.js';
 import { 
   createGuild,
@@ -476,28 +477,21 @@ async function handleGuildStatsCommand(guildName, channelId) {
 // Helper Functions
 
 function calculateProgressToNextLevel(currentXP, currentLevel) {
-  const levelThresholds = [
-    0, 160, 360, 600, 880, 1200, // Levels 1-5
-    1600, 2000, 2400, 2800, 3200, // Levels 6-10
-    3800, 4400, 5000, 5600, 6200, // Levels 11-15
-    7000, 7800, 8600, 9400, 10400 // Levels 16-20
-  ];
-  
   if (currentLevel >= 20) {
     return { current: 0, needed: 0, percentage: 100 };
   }
   
-  const currentLevelXP = levelThresholds[currentLevel - 1] || 0;
-  const nextLevelXP = levelThresholds[currentLevel] || levelThresholds[levelThresholds.length - 1];
+  const currentLevelXP = getXpForLevel(currentLevel);
+  const nextLevelXP = getXpForLevel(currentLevel + 1);
   
   const progressInLevel = currentXP - currentLevelXP;
   const xpNeededForLevel = nextLevelXP - currentLevelXP;
   const percentage = Math.round((progressInLevel / xpNeededForLevel) * 100);
   
   return {
-    current: progressInLevel,
+    current: Math.max(0, progressInLevel), // Ensure never negative
     needed: xpNeededForLevel,
-    percentage: Math.min(percentage, 100)
+    percentage: Math.min(Math.max(0, percentage), 100) // Clamp between 0-100
   };
 }
 
