@@ -6,6 +6,7 @@ import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from '
 import { createUser, createUserWithEmail, getUserBySlackId } from '../lib/user-service.js';
 import { LEVEL_THRESHOLDS, getXpForLevel } from '../lib/xp-calculator.js';
 import { validateSlackChannel, validateCommandContext } from '../lib/slack-service.js';
+import { refreshHomeTab } from '../lib/home-tab-service.js';
 import { 
   createGuild,
   joinGuild,
@@ -297,6 +298,11 @@ If you only have your email address, you can also use: \`/rpg-register-email you
     const trimmedUsername = jiraUsername.trim();
     const newUser = await createUser(userId, userName, trimmedUsername);
     
+    // Refresh Home tab for the newly registered user
+    refreshHomeTab(userId, newUser).catch(error => {
+      console.error('Failed to refresh Home tab after registration:', error);
+    });
+    
     return {
       text: `🎉 **Welcome to the RPG, ${userName}!**
 
@@ -359,6 +365,11 @@ async function handleRegisterEmailCommand(userId, userName, email) {
   try {
     const trimmedEmail = email.trim();
     const newUser = await createUserWithEmail(userId, userName, trimmedEmail);
+    
+    // Refresh Home tab for the newly registered user
+    refreshHomeTab(userId, newUser).catch(error => {
+      console.error('Failed to refresh Home tab after registration:', error);
+    });
     
     return {
       text: `🎉 **Welcome to the RPG, ${userName}!**
@@ -1054,6 +1065,9 @@ async function handleInteractiveComponent(payload, res) {
       } else {
         console.log('Unknown callback_id:', payload.view?.callback_id);
       }
+    } else if (payload.type === 'block_actions') {
+      console.log('Processing block actions...');
+      return await handleBlockActions(payload, res);
     } else {
       console.log('Non-view_submission type:', payload.type);
     }
@@ -1359,4 +1373,125 @@ function parseGuildCreateArgs(text) {
   } catch (error) {
     return { isValid: false, error: 'Failed to parse arguments' };
   }
+}
+
+/**
+ * Handles block actions from interactive components (buttons, select menus, etc.)
+ * @param {Object} payload - Slack interaction payload
+ * @param {Object} res - Express response object
+ */
+async function handleBlockActions(payload, res) {
+  try {
+    const { user, actions } = payload;
+    const action = actions[0]; // Get the first action
+    
+    console.log('Block action received:', {
+      actionId: action.action_id,
+      userId: user.id,
+      value: action.value
+    });
+
+    switch (action.action_id) {
+      case 'register_button':
+        return await handleRegisterButtonAction(user.id, res);
+        
+      case 'view_status':
+        return await handleViewStatusAction(user.id, res);
+        
+      case 'view_leaderboard':
+        return await handleViewLeaderboardAction(res);
+        
+      case 'view_guilds':
+      case 'manage_guilds':
+        return await handleViewGuildsAction(res);
+        
+      case 'join_guild':
+        return await handleJoinGuildAction(res);
+        
+      default:
+        console.log('Unknown action ID:', action.action_id);
+        return res.status(200).json({});
+    }
+
+  } catch (error) {
+    console.error('Block action error:', error);
+    return res.status(200).json({});
+  }
+}
+
+/**
+ * Handles the register button action from Home tab
+ */
+async function handleRegisterButtonAction(userId, res) {
+  return res.status(200).json({
+    text: "🎮 To register for Backlog Bard RPG, use the command:\n\n`/rpg-register your.email@company.com`\n\nReplace with your actual work email address to link your JIRA account!",
+    response_type: 'ephemeral'
+  });
+}
+
+/**
+ * Handles the view status button action from Home tab
+ */
+async function handleViewStatusAction(userId, res) {
+  try {
+    const statusResponse = await handleStatusCommand(userId, 'Unknown');
+    return res.status(200).json({
+      text: statusResponse.text,
+      response_type: 'ephemeral'
+    });
+  } catch (error) {
+    console.error('View status action error:', error);
+    return res.status(200).json({
+      text: "⚠️ Unable to retrieve your status at the moment. Please try again later.",
+      response_type: 'ephemeral'
+    });
+  }
+}
+
+/**
+ * Handles the view leaderboard button action from Home tab
+ */
+async function handleViewLeaderboardAction(res) {
+  try {
+    const leaderboardResponse = await handleLeaderboardCommand();
+    return res.status(200).json({
+      text: leaderboardResponse.text,
+      response_type: 'ephemeral'
+    });
+  } catch (error) {
+    console.error('View leaderboard action error:', error);
+    return res.status(200).json({
+      text: "⚠️ Unable to retrieve the leaderboard at the moment. Please try again later.",
+      response_type: 'ephemeral'
+    });
+  }
+}
+
+/**
+ * Handles the view/manage guilds button action from Home tab
+ */
+async function handleViewGuildsAction(res) {
+  try {
+    const guildsResponse = await handleGuildListCommand();
+    return res.status(200).json({
+      text: guildsResponse.text,
+      response_type: 'ephemeral'
+    });
+  } catch (error) {
+    console.error('View guilds action error:', error);
+    return res.status(200).json({
+      text: "⚠️ Unable to retrieve guild information at the moment. Please try again later.",
+      response_type: 'ephemeral'
+    });
+  }
+}
+
+/**
+ * Handles the join guild button action from Home tab
+ */
+async function handleJoinGuildAction(res) {
+  return res.status(200).json({
+    text: "🏰 To join a guild, use one of these commands:\n\n• `/rpg-guild-list` - See all available guilds\n• `/rpg-guild-join <guild-name>` - Join a specific guild\n• `/rpg-guild-create` - Create your own guild",
+    response_type: 'ephemeral'
+  });
 }

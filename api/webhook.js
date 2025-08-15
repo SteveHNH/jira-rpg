@@ -6,6 +6,7 @@ import { awardXpFromWebhook, getUserByJiraIdentifier, createUserFromWebhook } fr
 import { getTitleForLevel } from '../lib/xp-calculator.js';
 import { transformWebhookToTicketData, extractIssueDetails } from '../lib/data-processing.js';
 import { debugLog } from '../lib/req-debug.js';
+import { refreshHomeTab } from '../lib/home-tab-service.js';
 
 // Enhanced webhook processing with flexible user lookup and auto-creation
 async function processWebhookPayload(payload) {
@@ -63,6 +64,13 @@ async function processWebhookPayload(payload) {
   const finalUserSnap = await getDoc(userRef);
   const finalUserData = finalUserSnap.data();
   await debugLog(finalUserData, 'user-data');
+
+  // Refresh Home tab for user if they have a Slack ID
+  if (finalUserData.slackUserId) {
+    refreshHomeTab(finalUserData.slackUserId, finalUserData).catch(error => {
+      console.error('Failed to refresh Home tab:', error);
+    });
+  }
 
   return {
     userId,

@@ -3,6 +3,7 @@
 import crypto from 'crypto';
 import { getUserBySlackId } from '../lib/user-service.js';
 import { handleConversationalRequest } from '../lib/conversation-service.js';
+import { publishHomeTab } from '../lib/home-tab-service.js';
 
 // Simple in-memory cache to prevent duplicate message processing
 const processedMessages = new Map();
@@ -58,10 +59,17 @@ export default async function handler(req, res) {
         hasText: !!event?.text
       });
 
-      // Only handle direct messages (async - don't wait for completion)
+      // Handle direct messages (async - don't wait for completion)
       if (event.type === 'message' && event.channel_type === 'im') {
         handleDirectMessage(event).catch(error => {
           console.error('Async DM handling error:', error);
+        });
+      }
+
+      // Handle App Home opened events (async - don't wait for completion)
+      if (event.type === 'app_home_opened') {
+        handleAppHomeOpened(event).catch(error => {
+          console.error('Async App Home handling error:', error);
         });
       }
 
@@ -267,4 +275,31 @@ function verifySlackEventRequest(req) {
     return false;
   }
   */
+}
+
+/**
+ * Handles App Home opened events from Slack
+ * @param {Object} event - Slack app_home_opened event
+ */
+async function handleAppHomeOpened(event) {
+  try {
+    const { user, tab } = event;
+
+    console.log('App Home opened by user:', user, 'tab:', tab);
+
+    // Only handle the Home tab (not Messages or About tabs)
+    if (tab !== 'home') {
+      console.log('Ignoring non-home tab:', tab);
+      return;
+    }
+
+    // Check if user is registered in our system
+    const userData = await getUserBySlackId(user);
+    
+    // Publish the Home tab view (works for both registered and unregistered users)
+    await publishHomeTab(user, userData);
+
+  } catch (error) {
+    console.error('Error handling App Home opened:', error);
+  }
 }
