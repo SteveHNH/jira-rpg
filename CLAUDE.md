@@ -232,6 +232,34 @@ jira-rpg/
 - Proper Slack markdown formatting
 - Enhanced quest statistics display
 
+#### Production Webhook Enhancement (Session: 2025-08-15)
+- **Purpose**: Fixed webhook processing to prevent unregistered users receiving stories and eliminate story spam to all guild channels
+- **Location**: Enhanced `api/webhook.js`, `lib/story-generator.js`
+- **Key Features**:
+  - **Universal User Creation**: Every JIRA webhook automatically creates user in database (regardless of registration)
+  - **Guild Membership Gating**: Only users with guild memberships receive story notifications
+  - **Smart Guild Filtering**: Stories only sent to guilds where user is actually a member
+  - **Duplicate Prevention**: No more stories sent to all guild channels
+  - **XP Tracking**: All users receive XP regardless of guild membership or registration status
+
+#### Webhook Processing Behavior
+```javascript
+// Current webhook behavior:
+JIRA Webhook → Create/Update User in DB → Check Guild Membership
+├─ No Guild Membership: XP Only (no stories)
+└─ Has Guild Membership: 
+   ├─ Find Matching Guilds (by components/labels)
+   ├─ Filter by User's Guild Memberships
+   ├─ Send Stories to Relevant Guild Channels
+   └─ DM Fallback (if no guild matches)
+```
+
+#### User Database Structure
+- **Auto-Creation**: Users created automatically from JIRA webhook data
+- **Registration Status**: `slackUserId: null` = unregistered, `slackUserId: "U123..."` = registered
+- **Guild Membership**: `guilds: ["guild-name-1", "guild-name-2"]` array determines story routing
+- **XP Tracking**: All users accumulate XP regardless of registration/guild status
+
 #### Conversational JIRA Storytelling (Session: 2025-08-14)
 - **Purpose**: Natural language DM conversations about user's JIRA accomplishments
 - **Location**: `api/slack-events.js`, `lib/jira-client.js`, `lib/conversation-service.js`, `ConversationalModelfile`
@@ -264,6 +292,33 @@ jira-rpg/
 - **Response Format**: JSON with message and ticket summary
 - **Adaptive**: Handles both ticket queries and general conversation
 - **Celebratory**: Turns coding work into heroic adventures and accomplishments
+
+#### Enhanced Webhook Processing (Session: 2025-08-15)
+- **Purpose**: Improved webhook logic to prevent stories going to unregistered users and all guild channels
+- **Location**: Enhanced `api/webhook.js`, `lib/story-generator.js`
+- **Key Features**:
+  - Automatic user creation in database for all JIRA webhook events (XP tracking)
+  - Guild membership validation before story generation
+  - User-specific guild filtering (only sends to guilds where user is a member)
+  - Prevention of duplicate notifications and stories to unregistered users
+
+#### Webhook Processing Flow
+```javascript
+// Enhanced webhook processing flow:
+1. Webhook Received → Always Create/Update User in DB
+2. Check Guild Membership → userData.guilds.length > 0
+3. IF No Guild Membership → Skip Story Generation (XP Only)
+4. IF Has Guild Membership → Find Matching Guilds by Components/Labels
+5. Filter Guilds → Only Include User's Guild Memberships
+6. Generate & Route Stories → Send to Relevant Guild Channels Only
+7. DM Fallback → Only if No Guild Channels Matched
+```
+
+#### User Creation Logic
+- **Automatic Creation**: Every JIRA webhook creates user in database if not exists
+- **XP Tracking**: All users get XP regardless of registration status
+- **Guild Membership**: Only guild members receive story notifications
+- **Registration Status**: `slackUserId: null` indicates unregistered user
 
 ### 🔧 Development Tools Created
 - **JIRA Testing Directory**: `jira-testing/` with API scripts
