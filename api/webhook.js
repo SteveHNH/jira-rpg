@@ -92,7 +92,7 @@ export default async function handler(req, res) {
     
     // Process the webhook payload
     const result = await processWebhookPayload(payload);
-  await debugLog(result, 'jira-data');
+  await debugLog(payload, 'jira-data');
     
     // NEW: Guild-aware story routing
     let guildRoutingResult = null;
