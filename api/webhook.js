@@ -7,6 +7,7 @@ import { getTitleForLevel } from '../lib/xp-calculator.js';
 import { transformWebhookToTicketData, extractIssueDetails } from '../lib/data-processing.js';
 import { debugLog } from '../lib/req-debug.js';
 import { refreshHomeTab } from '../lib/home-tab-service.js';
+import { saveStory } from '../lib/story-service.js';
 
 // Enhanced webhook processing with flexible user lookup and auto-creation
 async function processWebhookPayload(payload) {
@@ -128,6 +129,25 @@ export default async function handler(req, res) {
         success: guildRoutingResult.success
       });
 
+      // Save story to Firebase if guild routing generated one
+      if (guildRoutingResult.success && guildRoutingResult.storyData && guildRoutingResult.routedChannels > 0) {
+        try {
+          const guildNames = guildRoutingResult.results ? guildRoutingResult.results.map(r => r.guild) : [];
+          await saveStory({
+            userJiraUsername: userData.jiraUsername,
+            ticketKey: result.issueDetails.issueKey,
+            narrative: guildRoutingResult.storyData.narrative || guildRoutingResult.storyData,
+            ticketData: guildRoutingResult.storyData.ticketData || {},
+            xpAward: result.xpResult,
+            guilds: guildNames,
+            timestamp: new Date().toISOString()
+          });
+          console.log('Guild story saved to Firebase for ticket:', result.issueDetails.issueKey);
+        } catch (saveError) {
+          console.error('Failed to save guild story to Firebase:', saveError);
+        }
+      }
+
       // Fallback to DM if no guild routing occurred
       if (guildRoutingResult.routedChannels === 0) {
         console.log('No guilds matched, sending DM notification as fallback');
@@ -155,6 +175,22 @@ export default async function handler(req, res) {
             xpAward: result.xpResult,
             timestamp: new Date().toISOString()
           };
+          
+          // Save story to Firebase for later retrieval
+          try {
+            await saveStory({
+              userJiraUsername: userData.jiraUsername,
+              ticketKey: result.issueDetails.issueKey,
+              narrative: storyResult,
+              ticketData: ticketData,
+              xpAward: result.xpResult,
+              guilds: [], // No guilds since this is DM fallback
+              timestamp: storyGeneration.timestamp
+            });
+            console.log('Story saved to Firebase for ticket:', result.issueDetails.issueKey);
+          } catch (saveError) {
+            console.error('Failed to save story to Firebase:', saveError);
+          }
           
           dmNotification = await sendStoryNotification(
             storyGeneration,
@@ -226,6 +262,22 @@ export default async function handler(req, res) {
           xpAward: result.xpResult,
           timestamp: new Date().toISOString()
         };
+        
+        // Save story to Firebase for later retrieval
+        try {
+          await saveStory({
+            userJiraUsername: userData.jiraUsername,
+            ticketKey: result.issueDetails.issueKey,
+            narrative: storyResult,
+            ticketData: ticketData,
+            xpAward: result.xpResult,
+            guilds: [], // No guilds since this is fallback
+            timestamp: storyGeneration.timestamp
+          });
+          console.log('Fallback story saved to Firebase for ticket:', result.issueDetails.issueKey);
+        } catch (saveError) {
+          console.error('Failed to save fallback story to Firebase:', saveError);
+        }
         
         dmNotification = await sendStoryNotification(
           storyGeneration,
