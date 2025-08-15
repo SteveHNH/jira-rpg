@@ -221,7 +221,7 @@ export default async function handler(req, res) {
         ]);
         
         storyGeneration = {
-          narrative: storyResult,
+          narrative: storyResult.story || storyResult,
           guildInfo: guildInfo,
           ollamaHealth: ollamaHealth,
           ticketData: ticketData, // Include transformed data for debugging

@@ -141,7 +141,8 @@ export default async function handler(req, res) {
           await saveStory({
             userJiraUsername: userJiraUsername,
             ticketKey: result.issueDetails.issueKey,
-            narrative: guildRoutingResult.storyData.narrative || guildRoutingResult.storyData,
+            status: result.issueDetails.status || 'Unknown',
+            narrative: guildRoutingResult.storyData.narrative || guildRoutingResult.storyData.story || 'Epic tale completed!',
             ticketData: guildRoutingResult.storyData.ticketData || {},
             xpAward: result.xpResult,
             guilds: guildNames,
@@ -173,7 +174,7 @@ export default async function handler(req, res) {
           ]);
           
           const storyGeneration = {
-            narrative: storyResult,
+            narrative: storyResult.story || storyResult,
             guildInfo: guildInfo,
             ollamaHealth: ollamaHealth,
             ticketData: ticketData,
@@ -191,7 +192,8 @@ export default async function handler(req, res) {
             await saveStory({
               userJiraUsername: userJiraUsername,
               ticketKey: result.issueDetails.issueKey,
-              narrative: storyResult,
+              status: result.issueDetails.status || ticketData.status || 'Unknown',
+              narrative: storyResult.story || storyResult,
               ticketData: ticketData,
               xpAward: result.xpResult,
               guilds: [], // No guilds since this is DM fallback
@@ -265,7 +267,7 @@ export default async function handler(req, res) {
         ]);
         
         const storyGeneration = {
-          narrative: storyResult,
+          narrative: storyResult.story || storyResult,
           guildInfo: guildInfo,
           ollamaHealth: ollamaHealth,
           ticketData: ticketData,
@@ -283,6 +285,7 @@ export default async function handler(req, res) {
           await saveStory({
             userJiraUsername: userJiraUsername,
             ticketKey: result.issueDetails.issueKey,
+            status: result.issueDetails.status || ticketData.status || 'Unknown',
             narrative: storyResult,
             ticketData: ticketData,
             xpAward: result.xpResult,
