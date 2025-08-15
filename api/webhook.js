@@ -2,12 +2,12 @@ import { db } from '../lib/firebase.js';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { testStoryGeneration, checkOllamaHealth, extractGuildInfo, routeStoryToGuilds } from '../lib/story-generator.js';
 import { sendStoryNotification } from '../lib/slack-service.js';
-import { awardXpFromWebhook } from '../lib/user-service.js';
+import { awardXpFromWebhook, getUserByJiraIdentifier, createUserFromWebhook } from '../lib/user-service.js';
 import { getTitleForLevel } from '../lib/xp-calculator.js';
 import { transformWebhookToTicketData, extractIssueDetails } from '../lib/data-processing.js';
 import { debugLog } from '../lib/req-debug.js';
 
-// Process webhook payload with proper XP calculation and story generation
+// Enhanced webhook processing with flexible user lookup and auto-creation
 async function processWebhookPayload(payload) {
   const { issue, user } = payload;
   
@@ -15,35 +15,37 @@ async function processWebhookPayload(payload) {
     throw new Error('No user found in payload');
   }
 
-  const userId = user.emailAddress || user.name || user.displayName || 'unknown-user';
+  // Enhanced user lookup using multiple identifiers
+  let existingUser = await getUserByJiraIdentifier(user);
+  let userData;
+  let userId;
+  
+  if (existingUser) {
+    // User found using enhanced lookup
+    userData = existingUser;
+    userId = existingUser.id;
+    console.log(`Found existing user: ${userId} via enhanced lookup`);
+  } else {
+    // Auto-create user from webhook data
+    console.log('User not found, auto-creating from webhook data:', {
+      name: user.name,
+      accountId: user.accountId,
+      emailAddress: user.emailAddress,
+      displayName: user.displayName
+    });
+    
+    userData = await createUserFromWebhook(user);
+    userId = userData.id;
+    console.log(`Auto-created user: ${userId}`);
+  }
   
   // Extract issue details
   const issueDetails = extractIssueDetails(payload);
   
-  // Get user data
-  const userRef = doc(db, 'users', userId);
-  const userSnap = await getDoc(userRef);
-  
-  let userData;
-  if (!userSnap.exists()) {
-    // Create new user
-    userData = {
-      slackUserId: null,
-      jiraUsername: user.name || userId,
-      displayName: user.displayName || user.name || userId,
-      xp: 0,
-      level: 1,
-      currentTitle: getTitleForLevel(1),
-      joinedAt: new Date(),
-      lastActivity: new Date()
-    };
-    await setDoc(userRef, userData);
-  } else {
-    userData = userSnap.data();
-  }
-  
   // Debug payload structure before XP calculation
   await debugLog({
+    userId: userId,
+    userLookupMethod: existingUser ? 'enhanced-lookup' : 'auto-created',
     hasChangelog: !!payload.changelog,
     changelogItems: payload.changelog?.items,
     webhookEvent: payload.webhookEvent,
@@ -56,11 +58,11 @@ async function processWebhookPayload(payload) {
   // Debug XP calculation result
   await debugLog(xpResult, 'xp-result');
   
-  // Get final user data
+  // Get final user data after XP award
+  const userRef = doc(db, 'users', userId);
   const finalUserSnap = await getDoc(userRef);
   const finalUserData = finalUserSnap.data();
   await debugLog(finalUserData, 'user-data');
-  
 
   return {
     userId,
@@ -70,7 +72,8 @@ async function processWebhookPayload(payload) {
       level: finalUserData.level,
       title: finalUserData.currentTitle
     },
-    issueDetails
+    issueDetails,
+    userCreated: !existingUser // Flag indicating if user was auto-created
   };
 }
 

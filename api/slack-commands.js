@@ -3,7 +3,7 @@
 import { verifySlackRequest, getUserInfo } from '../lib/slack.js';
 import { db } from '../lib/firebase.js';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { createUser, getUserBySlackId } from '../lib/user-service.js';
+import { createUser, createUserWithEmail, getUserBySlackId } from '../lib/user-service.js';
 import { LEVEL_THRESHOLDS, getXpForLevel } from '../lib/xp-calculator.js';
 import { validateSlackChannel, validateCommandContext } from '../lib/slack-service.js';
 import { 
@@ -96,6 +96,10 @@ export default async function handler(req, res) {
         response = await handleRegisterCommand(user_id, user_name, text);
         break;
       
+      case '/rpg-register-email':
+        response = await handleRegisterEmailCommand(user_id, user_name, text);
+        break;
+      
       case '/rpg-leaderboard':
         response = await handleLeaderboardCommand(channel_id);
         break;
@@ -183,7 +187,8 @@ async function handleHelpCommand() {
 
 📊 **Player Commands:**
 • \`/rpg-status\` - Check your level, XP, and achievements
-• \`/rpg-register <email>\` - Link your Slack to JIRA
+• \`/rpg-register <jira-username>\` - Link your Slack to JIRA (recommended)
+• \`/rpg-register-email <email>\` - Link using email (legacy)
 • \`/rpg-achievements\` - View your unlocked achievements
 
 🏰 **Guild Commands:**
@@ -274,10 +279,70 @@ Keep completing tickets to level up! 🌟`;
   }
 }
 
-async function handleRegisterCommand(userId, userName, email) {
+async function handleRegisterCommand(userId, userName, jiraUsername) {
+  if (!jiraUsername || jiraUsername.trim() === '') {
+    return {
+      text: `❓ Please provide your JIRA username: \`/rpg-register your.jira.username\`
+
+💡 **Tip:** Your JIRA username is usually found in your JIRA profile URL or when you @mention someone in JIRA.
+
+**Example:** \`/rpg-register sarah.developer\`
+
+If you only have your email address, you can also use: \`/rpg-register-email your.email@company.com\``,
+      response_type: 'ephemeral'
+    };
+  }
+  
+  try {
+    const trimmedUsername = jiraUsername.trim();
+    const newUser = await createUser(userId, userName, trimmedUsername);
+    
+    return {
+      text: `🎉 **Welcome to the RPG, ${userName}!**
+
+🗡️ You've been registered with JIRA username: **${trimmedUsername}**
+📊 Starting Level: **1** (Novice Adventurer)
+⚔️ Current XP: **0**
+${newUser.email ? `📧 Linked email: **${newUser.email}**` : ''}
+
+Complete JIRA tickets to start earning XP and leveling up! Your epic coding adventures await! 🌟`,
+      response_type: 'ephemeral'
+    };
+    
+  } catch (error) {
+    console.error('Registration error:', error);
+    
+    if (error.message.includes('already registered')) {
+      return {
+        text: `⚠️ ${error.message}. Use \`/rpg-status\` to check your current progress!`,
+        response_type: 'ephemeral'
+      };
+    }
+    
+    if (error.message.includes('validation failed')) {
+      return {
+        text: `❌ JIRA username "${jiraUsername.trim()}" not found. Please check your username and try again.
+
+💡 **Tips:**
+• Check your JIRA profile for the correct username
+• Try your email address with \`/rpg-register-email\` instead
+• Contact an admin if you need help finding your JIRA username`,
+        response_type: 'ephemeral'
+      };
+    }
+    
+    return {
+      text: '❌ Registration failed. Please try again later or contact an admin.',
+      response_type: 'ephemeral'
+    };
+  }
+}
+
+// Legacy email registration for backward compatibility
+async function handleRegisterEmailCommand(userId, userName, email) {
   if (!email || email.trim() === '') {
     return {
-      text: '❓ Please provide your email address: `/rpg-register your.email@company.com`',
+      text: '❓ Please provide your email address: `/rpg-register-email your.email@company.com`',
       response_type: 'ephemeral'
     };
   }
@@ -286,14 +351,14 @@ async function handleRegisterCommand(userId, userName, email) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email.trim())) {
     return {
-      text: '❌ Please provide a valid email address: `/rpg-register your.email@company.com`',
+      text: '❌ Please provide a valid email address: `/rpg-register-email your.email@company.com`',
       response_type: 'ephemeral'
     };
   }
   
   try {
     const trimmedEmail = email.trim();
-    const newUser = await createUser(userId, userName, trimmedEmail);
+    const newUser = await createUserWithEmail(userId, userName, trimmedEmail);
     
     return {
       text: `🎉 **Welcome to the RPG, ${userName}!**
@@ -302,12 +367,14 @@ async function handleRegisterCommand(userId, userName, email) {
 📊 Starting Level: **1** (Novice Adventurer)
 ⚔️ Current XP: **0**
 
+⚠️ **Note:** Email registration is legacy. For better integration, consider re-registering with your JIRA username using \`/rpg-register your.jira.username\`
+
 Complete JIRA tickets to start earning XP and leveling up! Your epic coding adventures await! 🌟`,
       response_type: 'ephemeral'
     };
     
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('Email registration error:', error);
     
     if (error.message.includes('already registered')) {
       return {
