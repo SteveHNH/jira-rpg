@@ -132,9 +132,14 @@ export default async function handler(req, res) {
       // Save story to Firebase if guild routing generated one
       if (guildRoutingResult.success && guildRoutingResult.storyData && guildRoutingResult.routedChannels > 0) {
         try {
+          // Get user data from userId (userData is not in scope here)
+          const userRef = doc(db, 'users', result.userId);
+          const userSnap = await getDoc(userRef);
+          const userJiraUsername = userSnap.exists() ? userSnap.data().jiraUsername : result.userId;
+          
           const guildNames = guildRoutingResult.results ? guildRoutingResult.results.map(r => r.guild) : [];
           await saveStory({
-            userJiraUsername: userData.jiraUsername,
+            userJiraUsername: userJiraUsername,
             ticketKey: result.issueDetails.issueKey,
             narrative: guildRoutingResult.storyData.narrative || guildRoutingResult.storyData,
             ticketData: guildRoutingResult.storyData.ticketData || {},
@@ -178,8 +183,13 @@ export default async function handler(req, res) {
           
           // Save story to Firebase for later retrieval
           try {
+            // Get user data from userId (userData is not in scope here)
+            const userRef = doc(db, 'users', result.userId);
+            const userSnap = await getDoc(userRef);
+            const userJiraUsername = userSnap.exists() ? userSnap.data().jiraUsername : result.userId;
+            
             await saveStory({
-              userJiraUsername: userData.jiraUsername,
+              userJiraUsername: userJiraUsername,
               ticketKey: result.issueDetails.issueKey,
               narrative: storyResult,
               ticketData: ticketData,
@@ -265,8 +275,13 @@ export default async function handler(req, res) {
         
         // Save story to Firebase for later retrieval
         try {
+          // Get user data from userId (userData is not in scope here)
+          const userRef = doc(db, 'users', result.userId);
+          const userSnap = await getDoc(userRef);
+          const userJiraUsername = userSnap.exists() ? userSnap.data().jiraUsername : result.userId;
+          
           await saveStory({
-            userJiraUsername: userData.jiraUsername,
+            userJiraUsername: userJiraUsername,
             ticketKey: result.issueDetails.issueKey,
             narrative: storyResult,
             ticketData: ticketData,
