@@ -26,21 +26,32 @@ async function processWebhookPayload(payload) {
   
   let userData;
   if (!userSnap.exists()) {
-    // Create new user
+    // Create new user (always create for XP tracking)
     userData = {
-      slackUserId: null,
+      slackUserId: null, // User not registered with Slack bot yet
       jiraUsername: user.name || userId,
       displayName: user.displayName || user.name || userId,
       xp: 0,
       level: 1,
       currentTitle: getTitleForLevel(1),
+      guilds: [], // Start with no guild memberships
+      achievements: [],
+      totalTickets: 0,
+      totalBugs: 0,
       joinedAt: new Date(),
       lastActivity: new Date()
     };
     await setDoc(userRef, userData);
+    console.log('✅ Created new user in database:', userId);
   } else {
     userData = userSnap.data();
+    console.log('✅ Found existing user in database:', userId);
   }
+  
+  // Check if user is a member of any guild
+  const userGuilds = userData.guilds || [];
+  const hasGuildMembership = userGuilds.length > 0;
+  console.log('User guild membership status:', { userId, hasGuildMembership, guilds: userGuilds });
   
   // Debug payload structure before XP calculation
   await debugLog({
@@ -70,7 +81,8 @@ async function processWebhookPayload(payload) {
       level: finalUserData.level,
       title: finalUserData.currentTitle
     },
-    issueDetails
+    issueDetails,
+    hasGuildMembership
   };
 }
 
@@ -100,27 +112,91 @@ export default async function handler(req, res) {
     // Process the webhook payload
     const result = await processWebhookPayload(payload);
     
-    // NEW: Guild-aware story routing
+    // NEW: Guild-aware story routing - ONLY for guild members
     let guildRoutingResult = null;
     let dmNotification = null;
     
-    try {
-      console.log('Starting guild-aware story routing for issue:', result.issueDetails.issueKey);
-      
-      // Route story to matching guild channels
-      guildRoutingResult = await routeStoryToGuilds(payload);
-      await debugLog(guildRoutingResult, 'guild-routing-result');
-      
-      console.log('Guild routing completed:', {
-        routedChannels: guildRoutingResult.routedChannels,
-        matchingGuilds: guildRoutingResult.matchingGuilds,
-        success: guildRoutingResult.success
-      });
-
-      // Fallback to DM if no guild routing occurred
-      if (guildRoutingResult.routedChannels === 0) {
-        console.log('No guilds matched, sending DM notification as fallback');
+    if (!result.hasGuildMembership) {
+      console.log('User not in any guild, skipping all story notifications:', result.userId);
+      guildRoutingResult = {
+        success: true,
+        routedChannels: 0,
+        matchingGuilds: 0,
+        message: 'User not in any guild - no notifications sent',
+        skippedReason: 'no_guild_membership'
+      };
+    } else {
+      try {
+        console.log('Starting guild-aware story routing for guild member:', result.issueDetails.issueKey);
         
+        // Route story to matching guild channels (with user data for membership filtering)
+        const finalUserSnap = await getDoc(doc(db, 'users', result.userId));
+        const currentUserData = finalUserSnap.data();
+        guildRoutingResult = await routeStoryToGuilds(payload, currentUserData);
+        await debugLog(guildRoutingResult, 'guild-routing-result');
+        
+        console.log('Guild routing completed:', {
+          routedChannels: guildRoutingResult.routedChannels,
+          matchingGuilds: guildRoutingResult.matchingGuilds,
+          success: guildRoutingResult.success
+        });
+
+        // Fallback to DM if no guild routing occurred
+        if (guildRoutingResult.routedChannels === 0) {
+          console.log('No guilds matched, sending DM notification as fallback');
+          
+          try {
+            const ticketInfo = {
+              issueKey: result.issueDetails.issueKey,
+              issueUrl: result.issueDetails.issueUrl,
+              summary: result.issueDetails.summary
+            };
+            
+            // Generate individual story for DM (since no guild routing happened)
+            const ticketData = transformWebhookToTicketData(payload);
+            const [ollamaHealth, guildInfo, storyResult] = await Promise.all([
+              checkOllamaHealth(),
+              extractGuildInfo(payload.issue),
+              testStoryGeneration(ticketData)
+            ]);
+            
+            const storyGeneration = {
+              narrative: storyResult,
+              guildInfo: guildInfo,
+              ollamaHealth: ollamaHealth,
+              ticketData: ticketData,
+              xpAward: result.xpResult,
+              timestamp: new Date().toISOString()
+            };
+            
+            dmNotification = await sendStoryNotification(
+              storyGeneration,
+              ticketInfo,
+              payload.user
+            );
+            
+            console.log('DM notification result:', dmNotification);
+          } catch (dmError) {
+            console.error('DM notification failed:', dmError);
+            dmNotification = {
+              success: false,
+              error: dmError.message
+            };
+          }
+        } else {
+          // Guild routing succeeded, skip additional DM to avoid duplicates
+          console.log('Guild routing successful, skipping additional DM notification to avoid duplicates');
+          dmNotification = {
+            success: true,
+            skipped: true,
+            reason: 'guild_routing_successful'
+          };
+        }
+        
+      } catch (routingError) {
+        console.error('Guild routing failed for guild member, falling back to DM only:', routingError);
+        
+        // Critical fallback: Always ensure guild member gets story via DM
         try {
           const ticketInfo = {
             issueKey: result.issueDetails.issueKey,
@@ -128,7 +204,7 @@ export default async function handler(req, res) {
             summary: result.issueDetails.summary
           };
           
-          // Generate individual story for DM (since no guild routing happened)
+          // Generate story for fallback DM
           const ticketData = transformWebhookToTicketData(payload);
           const [ollamaHealth, guildInfo, storyResult] = await Promise.all([
             checkOllamaHealth(),
@@ -151,92 +227,22 @@ export default async function handler(req, res) {
             payload.user
           );
           
-          console.log('DM notification result:', dmNotification);
-        } catch (dmError) {
-          console.error('DM notification failed:', dmError);
+          console.log('Fallback DM notification sent:', dmNotification);
+        } catch (fallbackError) {
+          console.error('Even fallback DM failed:', fallbackError);
           dmNotification = {
             success: false,
-            error: dmError.message
+            error: fallbackError.message
           };
         }
-      } else {
-        // Guild routing succeeded, also send DM as backup
-        console.log('Guild routing successful, sending additional DM notification');
         
-        try {
-          const ticketInfo = {
-            issueKey: result.issueDetails.issueKey,
-            issueUrl: result.issueDetails.issueUrl,
-            summary: result.issueDetails.summary
-          };
-          
-          // Use the same story data from guild routing for DM
-          if (guildRoutingResult.storyData) {
-            dmNotification = await sendStoryNotification(
-              guildRoutingResult.storyData,
-              ticketInfo,
-              payload.user
-            );
-            console.log('Additional DM notification sent:', dmNotification);
-          }
-        } catch (dmError) {
-          console.error('Additional DM notification failed (non-critical):', dmError);
-          dmNotification = {
-            success: false,
-            error: dmError.message
-          };
-        }
-      }
-      
-    } catch (routingError) {
-      console.error('Guild routing failed, falling back to DM only:', routingError);
-      
-      // Critical fallback: Always ensure user gets story via DM
-      try {
-        const ticketInfo = {
-          issueKey: result.issueDetails.issueKey,
-          issueUrl: result.issueDetails.issueUrl,
-          summary: result.issueDetails.summary
-        };
-        
-        // Generate story for fallback DM
-        const ticketData = transformWebhookToTicketData(payload);
-        const [ollamaHealth, guildInfo, storyResult] = await Promise.all([
-          checkOllamaHealth(),
-          extractGuildInfo(payload.issue),
-          testStoryGeneration(ticketData)
-        ]);
-        
-        const storyGeneration = {
-          narrative: storyResult,
-          guildInfo: guildInfo,
-          ollamaHealth: ollamaHealth,
-          ticketData: ticketData,
-          xpAward: result.xpResult,
-          timestamp: new Date().toISOString()
-        };
-        
-        dmNotification = await sendStoryNotification(
-          storyGeneration,
-          ticketInfo,
-          payload.user
-        );
-        
-        console.log('Fallback DM notification sent:', dmNotification);
-      } catch (fallbackError) {
-        console.error('Even fallback DM failed:', fallbackError);
-        dmNotification = {
+        guildRoutingResult = {
           success: false,
-          error: fallbackError.message
+          error: routingError.message,
+          routedChannels: 0
         };
       }
-      
-      guildRoutingResult = {
-        success: false,
-        error: routingError.message,
-        routedChannels: 0
-      };
-    }
+    } // End of guild member check
     
     const responseData = {
       success: true,
