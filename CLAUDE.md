@@ -21,10 +21,12 @@ jira-rpg/
 ├── lib/
 │   ├── firebase.js            # Firebase connection
 │   ├── story-generator.js     # Ollama AI integration
+│   ├── story-service.js       # Story persistence and retrieval
 │   ├── user-service.js        # User XP/level operations
 │   ├── slack-service.js       # Slack API helpers
 │   ├── xp-calculator.js       # XP rules and leveling
 │   ├── jira-client.js         # JIRA REST API client
+│   ├── home-tab-service.js    # Slack App Home tab management
 │   └── conversation-service.js # Conversational storytelling orchestration
 ├── ConversationalModelfile     # Specialized Ollama model for DM conversations
 ```
@@ -64,6 +66,28 @@ jira-rpg/
   slackChannelId: "C123456",
   jiraComponents: ["UI", "Frontend", "React"],
   members: ["sarah@company.com"]
+}
+```
+
+### Stories
+```javascript
+{
+  userJiraUsername: "sarah.dev",
+  ticketKey: "PROJ-123",
+  narrative: "🗡️ Sarah the Developer bravely conquered the Login Bug of Doom...",
+  ticketData: {
+    title: "Fix login validation",
+    project: "PROJ",
+    components: ["Frontend", "Auth"],
+    timeSpent: "2h 30m"
+  },
+  xpAward: {
+    xp: 75,
+    reason: "Ticket completed (+50 XP), Bug fix bonus (+25 XP)"
+  },
+  guilds: ["Frontend Warriors", "Auth Guild"],
+  createdAt: Date,
+  timestamp: "2025-08-15T10:30:00.000Z"
 }
 ```
 
@@ -311,23 +335,103 @@ jira-rpg/
 - **App Home**: Enable Home Tab in Slack app settings
 - **Reinstall**: App must be reinstalled after adding new permissions
 
+#### Epic Story Persistence System (Session: 2025-08-15)
+- **Purpose**: Comprehensive story storage and retrieval system for maintaining epic quest narratives
+- **Location**: `lib/story-service.js`, enhanced `api/webhook.js`, `lib/home-tab-service.js`, `lib/conversation-service.js`
+- **Key Features**:
+  - Automatic story saving in all webhook processing paths
+  - Firebase 'stories' collection with proper indexing
+  - Home tab "Recent Adventures" section with real epic tales
+  - Enhanced DM conversations using saved narratives
+  - Story analytics and user quest history
+
+#### Story Persistence Features
+- **Automatic Saving**: All generated stories saved during webhook processing
+- **Multiple Entry Points**: Guild routing, DM fallback, and error scenarios covered
+- **Rich Data Structure**: Narrative, ticket data, XP awards, guild associations, timestamps
+- **Smart Retrieval**: Recent stories for Home tab, story lookup by ticket key
+- **Fallback Strategy**: DM conversations prioritize saved stories, fall back to JIRA API
+
+#### Story Data Flow
+```javascript
+// Complete story lifecycle:
+1. JIRA Webhook → Generate Epic Story → Save to Firebase 'stories'
+2. Home Tab → Retrieve Recent Stories → Display Adventures
+3. DM Query → Check Saved Stories → Return Epic Narratives
+4. Fallback → JIRA API → Generate New Story (if no saved stories)
+```
+
+#### Story Service Functions
+- **`saveStory(storyData)`**: Persist generated stories with full metadata
+- **`getRecentStories(userJiraUsername, limit)`**: Retrieve user's latest adventures
+- **`getStoryByTicket(userJiraUsername, ticketKey)`**: Find specific story by ticket
+- **`getStoryStats(userJiraUsername)`**: Get story analytics and user statistics
+
+#### Home Tab Recent Adventures
+- **Real Epic Tales**: Displays last 3 completed quest stories
+- **Rich Display**: Ticket key, XP gained, time stamps, narrative previews
+- **Time Formatting**: Human-readable "2h ago", "3d ago" format
+- **Progress Bar Fix**: Consistent XP calculation using DRY principle
+- **Graceful Fallbacks**: Handles users with no stories yet
+
+#### Enhanced DM Conversations
+- **Saved Story Priority**: Uses pre-generated epic narratives when available
+- **Faster Responses**: No need to generate new stories for existing tickets
+- **Rich Context**: Includes XP totals and quest counts in responses
+- **JIRA API Fallback**: Generates new stories when no saved data exists
+- **Consistent Experience**: Same stories appear in Home tab and DM conversations
+
+#### Story Persistence Data Structure
+```javascript
+// Stories Collection Document
+{
+  userJiraUsername: "user@company.com",    // User identification (consistent with other collections)
+  ticketKey: "PROJ-123",                   // JIRA ticket identifier
+  narrative: "🗡️ Epic fantasy story...",   // Generated story narrative
+  ticketData: {                            // Original ticket metadata
+    title: "Bug fix title",
+    project: "PROJ",
+    components: ["Frontend"],
+    timeSpent: "2h 30m"
+  },
+  xpAward: {                               // XP calculation results
+    xp: 75,
+    reason: "Detailed XP breakdown"
+  },
+  guilds: ["Guild1", "Guild2"],           // Associated guild names
+  createdAt: Date,                         // Firestore timestamp
+  timestamp: "ISO string"                  // Backup timestamp
+}
+```
+
+#### DM System Improvements
+- **Fixed Duplicate Prevention**: Serverless-compatible cache cleanup
+- **Reduced Cache Time**: 5 minutes instead of 10 minutes for faster expiration
+- **Better Logging**: Cache size tracking and duplicate detection debugging
+- **On-Demand Cleanup**: Cache cleanup runs on each request (serverless-friendly)
+- **Reliable Processing**: Prevents legitimate messages from being blocked
+
 ### 🔧 Development Tools Created
 - **JIRA Testing Directory**: `jira-testing/` with API scripts
-- **Test Scripts**: `test-webhook.sh`, `test-guild-routing.sh`, `test-conversational.sh`, `test-home-tab.js` for comprehensive testing
+- **Test Scripts**: `test-webhook.sh`, `test-guild-routing.sh`, `test-conversational.sh`, `test-home-tab.js`, `test-dm-functionality.js` for comprehensive testing
 - **Mock Data**: `mock-guild-tickets.json` with 5 routing scenarios
 - **Documentation**: `test.md`, `guild-routing-tests.md`, `slack-commands.md`, `CONVERSATIONAL_SETUP.md` for testing and configuration
 - **Planning**: `plan.md` with implementation details
 
 ### 🎯 Next Steps
-- Configure Slack app with new OAuth scopes (`app_home_read`) and events (`app_home_opened`)
-- Test Home tab with real users after Slack app reinstallation
-- Monitor Home tab usage and user engagement metrics
-- Implement recent activity feed in Home tab using story/XP history
-- Add Home tab refresh on guild membership changes
+- ✅ ~~Implement recent activity feed in Home tab using story/XP history~~ (COMPLETED: Recent Adventures section)
+- ✅ ~~Fix DM conversation system~~ (COMPLETED: Enhanced with saved stories and duplicate prevention fix)
+- Monitor story persistence system performance and storage usage
+- Implement story search and filtering capabilities
+- Add story analytics dashboard for users and admins
+- Create story export functionality (CSV, JSON)
+- Implement guild story competitions and leaderboards
+- Add story categorization and tagging system
 - Deploy conversational feature to production with JIRA API configuration
 - Build and deploy ConversationalModelfile to Ollama
 - Implement guild achievements and competitions
 - Add guild statistics and analytics dashboard
+- Monitor Home tab usage and user engagement metrics
 
 ## 🔑 Critical ID Usage Patterns
 
@@ -390,6 +494,11 @@ guild.leaderId === userData.slackUserId   // ❌ leaderId is jiraUsername, not s
 - Leadership field: `leaderId` (stores user's `jiraUsername`)
 - Member identification: `email` field in members array (matches `jiraUsername`)
 
+**Stories Collection:**
+- Document ID: Auto-generated
+- User identification: `userJiraUsername` (matches user's `jiraUsername`)
+- Indexing: Optimized for queries by `userJiraUsername` + `createdAt` for recent stories
+
 ### Query Pattern Examples
 
 **Find user by Slack ID:**
@@ -406,6 +515,18 @@ const guilds = await getGuildsByUser(slackUserId);  // Pass Slack ID, function h
 **Check guild leadership:**
 ```javascript
 const isLeader = guild.leaderId === userData.jiraUsername;  // Compare JIRA identifiers
+```
+
+**Get user's recent stories:**
+```javascript
+const stories = await getRecentStories(userData.jiraUsername, 5);  // Get last 5 stories
+// Returns: [{ id: "doc1", ticketKey: "PROJ-123", narrative: "...", xpAward: {...}, ... }]
+```
+
+**Find story by ticket:**
+```javascript
+const story = await getStoryByTicket(userData.jiraUsername, "PROJ-123");
+// Returns: { id: "doc1", narrative: "Epic tale...", guilds: ["Guild1"], ... } or null
 ```
 
 ### Testing & Debugging
