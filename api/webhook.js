@@ -41,25 +41,18 @@ async function processWebhookPayload(payload) {
   } else {
     userData = userSnap.data();
   }
+  await debugLog(userData, 'user-data');
   
   // Debug payload structure before XP calculation
-  await debugLog({
-    hasChangelog: !!payload.changelog,
-    changelogItems: payload.changelog?.items,
-    webhookEvent: payload.webhookEvent,
-    issueStatus: payload.issue?.fields?.status?.name
-  }, 'xp-debug-payload');
   
   // Award XP using dynamic calculation system
   const xpResult = await awardXpFromWebhook(userId, payload);
   
   // Debug XP calculation result
-  await debugLog(xpResult, 'xp-result');
   
   // Get final user data
   const finalUserSnap = await getDoc(userRef);
   const finalUserData = finalUserSnap.data();
-  await debugLog(finalUserData, 'user-data');
   
 
   return {
@@ -99,6 +92,7 @@ export default async function handler(req, res) {
     
     // Process the webhook payload
     const result = await processWebhookPayload(payload);
+  await debugLog(result, 'jira-data');
     
     // NEW: Guild-aware story routing
     let guildRoutingResult = null;
@@ -109,7 +103,6 @@ export default async function handler(req, res) {
       
       // Route story to matching guild channels
       guildRoutingResult = await routeStoryToGuilds(payload);
-      await debugLog(guildRoutingResult, 'guild-routing-result');
       
       console.log('Guild routing completed:', {
         routedChannels: guildRoutingResult.routedChannels,
