@@ -265,19 +265,67 @@ jira-rpg/
 - **Adaptive**: Handles both ticket queries and general conversation
 - **Celebratory**: Turns coding work into heroic adventures and accomplishments
 
+#### Slack App Home Tab (Session: 2025-08-15)
+- **Purpose**: Interactive dashboard interface replacing empty Home tab with personalized RPG experience
+- **Location**: `api/slack-events.js`, `lib/home-tab-service.js`, enhanced `api/slack-commands.js`, `api/webhook.js`
+- **Key Features**:
+  - Dynamic player dashboard with level, XP, and visual progress bars
+  - Guild membership display with leadership indicators (👑 for leaders, ⚔️ for members)
+  - Interactive quick action buttons for common commands
+  - Welcome screen for unregistered users with registration guidance
+  - Auto-refresh functionality after XP gains and user registration
+  - Block Kit compliant UI structure for Slack compatibility
+
+#### Home Tab Features
+- **For Registered Users**:
+  - Player stats: Level badge, total XP, visual progress bar to next level
+  - Guild info: List of joined guilds with role indicators
+  - Quick actions: Interactive buttons for status, leaderboard, guild management
+  - Recent activity: Placeholder for future story/activity feed
+- **For Unregistered Users**:
+  - Welcome screen with friendly onboarding message
+  - Registration instructions with interactive button
+  - Context and help links for getting started
+
+#### Home Tab Data Flow
+```javascript
+// App Home workflow:
+1. User Opens Home Tab → app_home_opened event → slack-events.js
+2. Check User Registration → getUserBySlackId()
+3. Build Dynamic View → home-tab-service.js (registered/unregistered)
+4. Publish to Slack → views.publish API
+5. Handle Button Clicks → block_actions → slack-commands.js
+6. Auto-refresh on Changes → webhook.js, registration commands
+```
+
+#### Home Tab Integration
+- **Event Handling**: Extended slack-events.js to handle `app_home_opened` events
+- **Block Kit UI**: Complete implementation using Slack's visual component framework
+- **Interactive Elements**: Button handlers for register, status, leaderboard, guild actions
+- **Auto-refresh**: Home tab updates automatically when users gain XP or register
+- **Error Resilience**: Graceful fallbacks for both registered and unregistered users
+
+#### Required Slack Permissions (Additional)
+- **OAuth Scopes**: `app_home_read` (new requirement)
+- **Events**: `app_home_opened` (new subscription needed)
+- **App Home**: Enable Home Tab in Slack app settings
+- **Reinstall**: App must be reinstalled after adding new permissions
+
 ### 🔧 Development Tools Created
 - **JIRA Testing Directory**: `jira-testing/` with API scripts
-- **Test Scripts**: `test-webhook.sh`, `test-guild-routing.sh`, `test-conversational.sh` for comprehensive testing
+- **Test Scripts**: `test-webhook.sh`, `test-guild-routing.sh`, `test-conversational.sh`, `test-home-tab.js` for comprehensive testing
 - **Mock Data**: `mock-guild-tickets.json` with 5 routing scenarios
 - **Documentation**: `test.md`, `guild-routing-tests.md`, `slack-commands.md`, `CONVERSATIONAL_SETUP.md` for testing and configuration
 - **Planning**: `plan.md` with implementation details
 
 ### 🎯 Next Steps
+- Configure Slack app with new OAuth scopes (`app_home_read`) and events (`app_home_opened`)
+- Test Home tab with real users after Slack app reinstallation
+- Monitor Home tab usage and user engagement metrics
+- Implement recent activity feed in Home tab using story/XP history
+- Add Home tab refresh on guild membership changes
 - Deploy conversational feature to production with JIRA API configuration
 - Build and deploy ConversationalModelfile to Ollama
-- Set up Slack Events API endpoint for DM message handling
-- Test conversational storytelling with real registered users
-- Monitor JIRA API usage and conversation engagement
 - Implement guild achievements and competitions
 - Add guild statistics and analytics dashboard
 
