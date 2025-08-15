@@ -8,17 +8,27 @@ import { publishHomeTab } from '../lib/home-tab-service.js';
 // Simple in-memory cache to prevent duplicate message processing
 const processedMessages = new Map();
 
-// Clean up old entries every 10 minutes
-setInterval(() => {
-  const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+// Cleanup function that runs on each request (serverless-friendly)
+function cleanupOldMessages() {
+  const fiveMinutesAgo = Date.now() - (5 * 60 * 1000); // Reduced to 5 minutes
+  let cleanedCount = 0;
+  
   for (const [key, timestamp] of processedMessages.entries()) {
-    if (timestamp < tenMinutesAgo) {
+    if (timestamp < fiveMinutesAgo) {
       processedMessages.delete(key);
+      cleanedCount++;
     }
   }
-}, 10 * 60 * 1000);
+  
+  if (cleanedCount > 0) {
+    console.log(`Cleaned up ${cleanedCount} old message entries. Cache size: ${processedMessages.size}`);
+  }
+}
 
 export default async function handler(req, res) {
+  // Clean up old cached messages on each request (serverless-friendly)
+  cleanupOldMessages();
+  
   console.log('Slack event received:', {
     method: req.method,
     contentType: req.headers['content-type'],
@@ -106,13 +116,18 @@ async function handleDirectMessage(event) {
       return;
     }
 
-    // Prevent duplicate message processing
+    // Prevent duplicate message processing using Slack's unique timestamp
     const messageKey = `${user}-${ts}`;
+    const now = Date.now();
+    
     if (processedMessages.has(messageKey)) {
-      console.log('Ignoring duplicate message:', messageKey);
+      console.log('Ignoring duplicate message:', messageKey, 'Cache size:', processedMessages.size);
       return;
     }
-    processedMessages.set(messageKey, Date.now());
+    
+    // Set expiration time with the timestamp for debugging
+    processedMessages.set(messageKey, now);
+    console.log('Added message to cache:', messageKey, 'Cache size:', processedMessages.size);
 
     console.log('Processing DM from user:', user, 'Text:', text.substring(0, 100));
 
