@@ -295,11 +295,14 @@ async function handleAppHomeOpened(event) {
 
     // Check if user is registered in our system
     const userData = await getUserBySlackId(user);
+    console.log('User data found:', userData ? 'registered' : 'unregistered');
     
     // Publish the Home tab view (works for both registered and unregistered users)
-    await publishHomeTab(user, userData);
+    const success = await publishHomeTab(user, userData);
+    console.log('Home tab publish result:', success);
 
   } catch (error) {
     console.error('Error handling App Home opened:', error);
+    console.error('Error stack:', error.stack);
   }
 }
