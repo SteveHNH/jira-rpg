@@ -104,10 +104,11 @@ const mockPayloads = {
 
 // Process webhook payload with proper XP calculation
 async function processWebhookPayload(payload) {
-  const { issue, user } = payload;
+  const { issue } = payload;
+  const user = issue?.fields?.assignee;
   
   if (!user) {
-    throw new Error('No user found in payload');
+    throw new Error('No assignee found in payload - ticket must be assigned to someone');
   }
 
   const userId = user.emailAddress || user.name || user.displayName || 'unknown-user';
@@ -243,7 +244,7 @@ export default async function handler(req, res) {
           slackNotification = await sendStoryNotification(
             storyGeneration,
             ticketInfo,
-            payload.user
+            payload.issue.fields.assignee
           );
           
           console.log('Slack notification result:', slackNotification);

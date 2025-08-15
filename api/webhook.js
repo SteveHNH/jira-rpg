@@ -9,10 +9,11 @@ import { debugLog } from '../lib/req-debug.js';
 
 // Process webhook payload with proper XP calculation and story generation
 async function processWebhookPayload(payload) {
-  const { issue, user } = payload;
+  const { issue } = payload;
+  const user = issue?.fields?.assignee;
   
   if (!user) {
-    throw new Error('No user found in payload');
+    throw new Error('No assignee found in payload - ticket must be assigned to someone');
   }
 
   const userId = user.emailAddress || user.name || user.displayName || 'unknown-user';
@@ -99,10 +100,10 @@ export default async function handler(req, res) {
 
   try {
     // Handle missing or malformed data gracefully
-    if (!req.body || !req.body.user) {
-      console.log('Invalid payload structure');
+    if (!req.body || !req.body.issue?.fields?.assignee) {
+      console.log('Invalid payload structure - missing assignee');
       return res.status(400).json({ 
-        error: 'Invalid payload', 
+        error: 'Invalid payload - issue must have an assignee', 
         received: req.body 
       });
     }
@@ -172,7 +173,7 @@ export default async function handler(req, res) {
             dmNotification = await sendStoryNotification(
               storyGeneration,
               ticketInfo,
-              payload.user
+              payload.issue.fields.assignee
             );
             
             console.log('DM notification result:', dmNotification);
@@ -224,7 +225,7 @@ export default async function handler(req, res) {
           dmNotification = await sendStoryNotification(
             storyGeneration,
             ticketInfo,
-            payload.user
+            payload.issue.fields.assignee
           );
           
           console.log('Fallback DM notification sent:', dmNotification);
