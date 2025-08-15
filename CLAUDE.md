@@ -329,4 +329,100 @@ jira-rpg/
 - Implement guild achievements and competitions
 - Add guild statistics and analytics dashboard
 
+## 🔑 Critical ID Usage Patterns
+
+**IMPORTANT: Consistent identifier usage to prevent Firebase query errors**
+
+### User Identification Fields
+```javascript
+// Users Collection Document Structure
+{
+  slackUserId: "U123456",           // Slack user ID (primary key for Slack lookups)
+  jiraUsername: "user.email@com",   // JIRA username/email (primary key for JIRA lookups) 
+  jiraAccountId: "abc123",          // JIRA account ID (secondary JIRA identifier)
+  email: "user@company.com",        // User's email address
+  displayName: "User Name"          // Display name for UI
+}
+```
+
+### Function Parameter Conventions
+
+#### ✅ CORRECT Usage Patterns
+
+**Slack-based Functions (expect Slack user IDs):**
+```javascript
+getUserBySlackId(slackUserId)           // ✅ Pass: "U123456"
+getGuildsByUser(slackUserId)            // ✅ Pass: "U123456" 
+publishHomeTab(slackUserId, userData)   // ✅ Pass: "U123456"
+refreshHomeTab(slackUserId, userData)   // ✅ Pass: "U123456"
+```
+
+**Guild Leadership Comparisons:**
+```javascript
+guild.leaderId === userData.jiraUsername  // ✅ Both are JIRA usernames/emails
+guild.leaderId === user.jiraUsername      // ✅ leaderId stored as jiraUsername
+```
+
+**User Creation Functions:**
+```javascript
+createUser(slackUserId, userName, jiraUsername)    // ✅ Distinct parameters
+createUserWithEmail(slackUserId, userName, email)  // ✅ Legacy function
+```
+
+#### ❌ COMMON MISTAKES to Avoid
+
+**Parameter Mismatches:**
+```javascript
+getGuildsByUser(userData.email)           // ❌ Expects slackUserId, not email
+getGuildsByUser(userData.jiraUsername)    // ❌ Expects slackUserId, not jiraUsername
+guild.leaderId === userData.email         // ❌ leaderId is jiraUsername, not email
+guild.leaderId === userData.slackUserId   // ❌ leaderId is jiraUsername, not slackUserId
+```
+
+### Document ID Conventions
+
+**Users Collection:**
+- Document ID: `jiraUsername` (user's JIRA username/email)
+- Lookup field: `slackUserId` for Slack-based queries
+
+**Guilds Collection:**
+- Document ID: Auto-generated 
+- Leadership field: `leaderId` (stores user's `jiraUsername`)
+- Member identification: `email` field in members array (matches `jiraUsername`)
+
+### Query Pattern Examples
+
+**Find user by Slack ID:**
+```javascript
+const user = await getUserBySlackId(slackUserId);
+// Returns: { id: "jira.username", slackUserId: "U123456", jiraUsername: "jira.username", ... }
+```
+
+**Find user's guilds:**
+```javascript
+const guilds = await getGuildsByUser(slackUserId);  // Pass Slack ID, function handles lookup
+```
+
+**Check guild leadership:**
+```javascript
+const isLeader = guild.leaderId === userData.jiraUsername;  // Compare JIRA identifiers
+```
+
+### Testing & Debugging
+
+When debugging ID-related issues:
+1. Check parameter types: Slack IDs start with "U", JIRA usernames are emails
+2. Verify function signatures match expected parameter types
+3. Use detailed logging to trace ID transformations
+4. Test with both registered and unregistered users
+
+**Debug Logging Example:**
+```javascript
+console.log('Function called with:', {
+  slackUserId: slackUserId,           // Should be "U123456" format
+  userDataType: userData?.jiraUsername ? 'registered' : 'unregistered',
+  jiraUsername: userData?.jiraUsername // Should be email format
+});
+```
+
 - Always create a plan.md when we start a feature request
