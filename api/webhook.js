@@ -81,6 +81,7 @@ async function processWebhookPayload(payload) {
       level: finalUserData.level,
       title: finalUserData.currentTitle
     },
+    userData: finalUserData, // Add complete user data to avoid redundant lookups
     issueDetails,
     userCreated: !existingUser // Flag indicating if user was auto-created
   };
@@ -132,10 +133,8 @@ export default async function handler(req, res) {
       // Save story to Firebase if guild routing generated one
       if (guildRoutingResult.success && guildRoutingResult.storyData && guildRoutingResult.routedChannels > 0) {
         try {
-          // Get user data from userId (userData is not in scope here)
-          const userRef = doc(db, 'users', result.userId);
-          const userSnap = await getDoc(userRef);
-          const userJiraUsername = userSnap.exists() ? userSnap.data().jiraUsername : result.userId;
+          // Use already fetched user data to avoid redundant Firebase lookup
+          const userJiraUsername = result.userData.jiraUsername || result.userId;
           
           const guildNames = guildRoutingResult.results ? guildRoutingResult.results.map(r => r.guild) : [];
           await saveStory({
@@ -184,10 +183,8 @@ export default async function handler(req, res) {
           
           // Save story to Firebase for later retrieval
           try {
-            // Get user data from userId (userData is not in scope here)
-            const userRef = doc(db, 'users', result.userId);
-            const userSnap = await getDoc(userRef);
-            const userJiraUsername = userSnap.exists() ? userSnap.data().jiraUsername : result.userId;
+            // Use already fetched user data to avoid redundant Firebase lookup
+            const userJiraUsername = result.userData.jiraUsername || result.userId;
             
             await saveStory({
               userJiraUsername: userJiraUsername,
@@ -277,10 +274,8 @@ export default async function handler(req, res) {
         
         // Save story to Firebase for later retrieval
         try {
-          // Get user data from userId (userData is not in scope here)
-          const userRef = doc(db, 'users', result.userId);
-          const userSnap = await getDoc(userRef);
-          const userJiraUsername = userSnap.exists() ? userSnap.data().jiraUsername : result.userId;
+          // Use already fetched user data to avoid redundant Firebase lookup
+          const userJiraUsername = result.userData.jiraUsername || result.userId;
           
           await saveStory({
             userJiraUsername: userJiraUsername,
