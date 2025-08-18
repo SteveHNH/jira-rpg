@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import { getUserBySlackId, testFirebaseConnection } from '../lib/user-service.js';
 import { handleConversationalRequest } from '../lib/conversation-service.js';
 import { publishHomeTab } from '../lib/home-tab-service.js';
+import { db } from '../lib/firebase.js';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 
 export default async function handler(req, res) {
   
@@ -96,6 +98,13 @@ async function handleDirectMessage(event) {
       channel,
       ts
     });
+
+    // Check for duplicate processing using Firebase
+    const isDuplicate = await checkAndMarkMessageProcessed(user, ts, text);
+    if (isDuplicate) {
+      console.log('Skipping duplicate message processing for ts:', ts);
+      return;
+    }
 
     // Ignore bot messages and specific system message subtypes
     if (bot_id || !text) {
@@ -381,5 +390,75 @@ async function handleAppHomeOpened(event) {
   } catch (error) {
     console.error('Error handling App Home opened:', error);
     console.error('Error stack:', error.stack);
+  }
+}
+
+/**
+ * Checks if a message has already been processed and marks it as processed
+ * @param {string} userId - Slack user ID
+ * @param {string} ts - Message timestamp
+ * @param {string} text - Message text (for additional verification)
+ * @returns {boolean} - True if message was already processed
+ */
+async function checkAndMarkMessageProcessed(userId, ts, text) {
+  try {
+    const messageId = `${userId}-${ts}`;
+    const messageRef = doc(db, 'processed_messages', messageId);
+    
+    // Check if message was already processed
+    const messageSnap = await getDoc(messageRef);
+    if (messageSnap.exists()) {
+      console.log('Message already processed:', messageId);
+      return true; // Duplicate
+    }
+    
+    // Mark message as processed
+    await setDoc(messageRef, {
+      userId,
+      ts,
+      textHash: crypto.createHash('md5').update(text).digest('hex'),
+      processedAt: new Date(),
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes from now
+    });
+    
+    console.log('Message marked as processed:', messageId);
+    
+    // Clean up old processed messages (fire and forget)
+    cleanupExpiredMessages().catch(error => {
+      console.error('Error cleaning up expired messages:', error);
+    });
+    
+    return false; // Not a duplicate
+    
+  } catch (error) {
+    console.error('Error checking message duplication:', error);
+    // If we can't check for duplicates, allow processing to continue
+    return false;
+  }
+}
+
+/**
+ * Cleans up expired processed messages (runs async in background)
+ */
+async function cleanupExpiredMessages() {
+  try {
+    const processedRef = collection(db, 'processed_messages');
+    const expiredQuery = query(processedRef, where('expiresAt', '<', new Date()));
+    const expiredSnap = await getDocs(expiredQuery);
+    
+    if (expiredSnap.empty) {
+      return;
+    }
+    
+    console.log(`Cleaning up ${expiredSnap.size} expired processed messages`);
+    
+    // Delete expired messages
+    const deletePromises = expiredSnap.docs.map(docSnap => deleteDoc(docSnap.ref));
+    await Promise.all(deletePromises);
+    
+    console.log('Expired message cleanup completed');
+    
+  } catch (error) {
+    console.error('Error during message cleanup:', error);
   }
 }
