@@ -132,7 +132,17 @@ async function handleDirectMessage(event) {
     console.log('Processing DM from user:', user, 'Text:', text.substring(0, 100));
 
     // Check if user is registered in our system
-    const userData = await getUserBySlackId(user);
+    let userData;
+    try {
+      console.log('Looking up user by Slack ID:', user);
+      userData = await getUserBySlackId(user);
+      console.log('User lookup result:', userData ? 'found' : 'not found');
+    } catch (error) {
+      console.error('Error during user lookup:', error);
+      await sendErrorMessage(channel);
+      return;
+    }
+    
     if (!userData) {
       console.log('User not registered:', user);
       await sendNotRegisteredMessage(channel);
@@ -140,7 +150,14 @@ async function handleDirectMessage(event) {
     }
 
     // Handle the conversational request
-    await handleConversationalRequest(user, text, channel, userData);
+    try {
+      console.log('Starting conversational request for user:', userData.jiraUsername);
+      await handleConversationalRequest(user, text, channel, userData);
+      console.log('Conversational request completed successfully');
+    } catch (error) {
+      console.error('Error in conversational request:', error);
+      await sendErrorMessage(channel);
+    }
 
   } catch (error) {
     console.error('Error handling direct message:', error);
