@@ -5,29 +5,7 @@ import { getUserBySlackId } from '../lib/user-service.js';
 import { handleConversationalRequest } from '../lib/conversation-service.js';
 import { publishHomeTab } from '../lib/home-tab-service.js';
 
-// Simple in-memory cache to prevent duplicate message processing
-const processedMessages = new Map();
-
-// Cleanup function that runs on each request (serverless-friendly)
-function cleanupOldMessages() {
-  const fiveMinutesAgo = Date.now() - (5 * 60 * 1000); // Reduced to 5 minutes
-  let cleanedCount = 0;
-  
-  for (const [key, timestamp] of processedMessages.entries()) {
-    if (timestamp < fiveMinutesAgo) {
-      processedMessages.delete(key);
-      cleanedCount++;
-    }
-  }
-  
-  if (cleanedCount > 0) {
-    console.log(`Cleaned up ${cleanedCount} old message entries. Cache size: ${processedMessages.size}`);
-  }
-}
-
 export default async function handler(req, res) {
-  // Clean up old cached messages on each request (serverless-friendly)
-  cleanupOldMessages();
   
   console.log('Slack event received:', {
     method: req.method,
@@ -116,26 +94,28 @@ async function handleDirectMessage(event) {
       return;
     }
 
-    // Prevent duplicate message processing using Slack's unique timestamp
-    const messageKey = `${user}-${ts}`;
-    const now = Date.now();
-    
-    if (processedMessages.has(messageKey)) {
-      console.log('Ignoring duplicate message:', messageKey, 'Cache size:', processedMessages.size);
-      return;
-    }
-    
-    // Set expiration time with the timestamp for debugging
-    processedMessages.set(messageKey, now);
-    console.log('Added message to cache:', messageKey, 'Cache size:', processedMessages.size);
-
     console.log('Processing DM from user:', user, 'Text:', text.substring(0, 100));
+    
+    // Send immediate acknowledgment message to user
+    console.log('About to send processing message to channel:', channel);
+    await sendProcessingMessage(channel);
+    console.log('Processing message sent, continuing with user lookup...');
 
     // Check if user is registered in our system
     let userData;
     try {
       console.log('Looking up user by Slack ID:', user);
-      userData = await getUserBySlackId(user);
+      
+      // Add timeout to Firebase lookup to prevent hanging  
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('User lookup timeout after 5 seconds')), 5000)
+      );
+      
+      userData = await Promise.race([
+        getUserBySlackId(user),
+        timeoutPromise
+      ]);
+      
       console.log('User lookup result:', userData ? 'found' : 'not found');
     } catch (error) {
       console.error('Error during user lookup:', error);
@@ -163,6 +143,44 @@ async function handleDirectMessage(event) {
     console.error('Error handling direct message:', error);
     // Send error message to user
     await sendErrorMessage(event.channel);
+  }
+}
+
+/**
+ * Sends immediate acknowledgment message to user
+ * @param {string} channel - Slack channel/DM ID
+ */
+async function sendProcessingMessage(channel) {
+  try {
+    const message = {
+      text: "⚔️ Greetings, brave adventurer! I'm conjuring up an epic tale of your recent coding quests... Give me a moment to weave the magic! ✨"
+    };
+
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Slack API timeout')), 3000)
+    );
+
+    await Promise.race([
+      fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          channel,
+          ...message
+        })
+      }),
+      timeoutPromise
+    ]);
+
+    console.log('Processing acknowledgment sent to channel:', channel);
+
+  } catch (error) {
+    console.error('Error sending processing message:', error);
+    // Don't throw - this is just an acknowledgment, continue processing
   }
 }
 
