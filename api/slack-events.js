@@ -47,18 +47,22 @@ export default async function handler(req, res) {
         hasText: !!event?.text
       });
 
-      // Handle direct messages (async - don't wait for completion)
+      // Handle direct messages (wait for completion to prevent serverless termination)
       if (event.type === 'message' && event.channel_type === 'im') {
-        handleDirectMessage(event).catch(error => {
-          console.error('Async DM handling error:', error);
-        });
+        try {
+          await handleDirectMessage(event);
+        } catch (error) {
+          console.error('DM handling error:', error);
+        }
       }
 
-      // Handle App Home opened events (async - don't wait for completion)
+      // Handle App Home opened events (wait for completion to prevent serverless termination)
       if (event.type === 'app_home_opened') {
-        handleAppHomeOpened(event).catch(error => {
-          console.error('Async App Home handling error:', error);
-        });
+        try {
+          await handleAppHomeOpened(event);
+        } catch (error) {
+          console.error('App Home handling error:', error);
+        }
       }
 
       return res.status(200).json({ ok: true });
