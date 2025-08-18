@@ -131,11 +131,12 @@ async function handleDirectMessage(event) {
 
     // Handle the conversational request
     try {
-      console.log('Starting conversational request for user:', userData.jiraUsername);
+      console.log('Starting conversational request for user:', userData.jiraUsername, 'message:', text.substring(0, 50));
       await handleConversationalRequest(user, text, channel, userData);
       console.log('Conversational request completed successfully');
     } catch (error) {
       console.error('Error in conversational request:', error);
+      console.error('Error stack:', error.stack);
       await sendErrorMessage(channel);
     }
 
