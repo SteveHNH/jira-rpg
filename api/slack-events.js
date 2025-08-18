@@ -1,7 +1,7 @@
 // api/slack-events.js - Slack Events API handler for DM conversations
 
 import crypto from 'crypto';
-import { getUserBySlackId } from '../lib/user-service.js';
+import { getUserBySlackId, testFirebaseConnection } from '../lib/user-service.js';
 import { handleConversationalRequest } from '../lib/conversation-service.js';
 import { publishHomeTab } from '../lib/home-tab-service.js';
 
@@ -113,20 +113,19 @@ async function handleDirectMessage(event) {
     }
 
     console.log('Processing DM from user:', user, 'Text:', text.substring(0, 100));
-    
-    // Send immediate acknowledgment message to user
-    console.log('About to send processing message to channel:', channel);
-    await sendProcessingMessage(channel);
-    console.log('Processing message sent, continuing with user lookup...');
 
     // Check if user is registered in our system
     let userData;
     try {
       console.log('Looking up user by Slack ID:', user);
       
+      // Skip connection test for now to improve speed
+      // const connectionTest = await testFirebaseConnection();
+      // console.log('Firebase connection test result:', connectionTest);
+      
       // Add timeout to Firebase lookup to prevent hanging  
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('User lookup timeout after 5 seconds')), 5000)
+        setTimeout(() => reject(new Error('User lookup timeout after 15 seconds')), 15000)
       );
       
       userData = await Promise.race([
@@ -175,12 +174,12 @@ async function sendProcessingMessage(channel) {
       text: "⚔️ Greetings, brave adventurer! I'm conjuring up an epic tale of your recent coding quests... Give me a moment to weave the magic! ✨"
     };
 
-    // Add timeout to prevent hanging
+    // Add timeout to prevent hanging (increased from 3s to 8s)
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Slack API timeout')), 3000)
+      setTimeout(() => reject(new Error('Slack API timeout after 8 seconds')), 8000)
     );
 
-    await Promise.race([
+    const response = await Promise.race([
       fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
         headers: {
@@ -194,6 +193,12 @@ async function sendProcessingMessage(channel) {
       }),
       timeoutPromise
     ]);
+
+    // Check if the Slack API call was successful
+    if (response && !response.ok) {
+      console.error('Slack API error:', response.status, response.statusText);
+      // Don't throw - this is just an acknowledgment message
+    }
 
     console.log('Processing acknowledgment sent to channel:', channel);
 
