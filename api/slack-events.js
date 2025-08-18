@@ -1,7 +1,7 @@
 // api/slack-events.js - Slack Events API handler for DM conversations
 
 import crypto from 'crypto';
-import { getUserBySlackId, testFirebaseConnection } from '../lib/user-service.js';
+import { getUserBySlackId } from '../lib/user-service.js';
 import { handleConversationalRequest } from '../lib/conversation-service.js';
 import { publishHomeTab } from '../lib/home-tab-service.js';
 import { db } from '../lib/firebase.js';
@@ -132,19 +132,7 @@ async function handleDirectMessage(event) {
     try {
       console.log('Looking up user by Slack ID:', user);
       
-      // Skip connection test for now to improve speed
-      // const connectionTest = await testFirebaseConnection();
-      // console.log('Firebase connection test result:', connectionTest);
-      
-      // Add timeout to Firebase lookup to prevent hanging  
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('User lookup timeout after 15 seconds')), 15000)
-      );
-      
-      userData = await Promise.race([
-        getUserBySlackId(user),
-        timeoutPromise
-      ]);
+      userData = await getUserBySlackId(user);
       
       console.log('User lookup result:', userData ? 'found' : 'not found');
     } catch (error) {
