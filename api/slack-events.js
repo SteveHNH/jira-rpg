@@ -82,9 +82,27 @@ async function handleDirectMessage(event) {
   try {
     const { user, text, channel, ts, bot_id, subtype } = event;
 
-    // Ignore bot messages and system messages
-    if (bot_id || subtype || !text) {
-      console.log('Ignoring bot/system message or message without text');
+    console.log('DM event details:', {
+      user,
+      hasText: !!text,
+      textLength: text?.length || 0,
+      textPreview: text?.substring(0, 50) || '',
+      bot_id,
+      subtype,
+      channel,
+      ts
+    });
+
+    // Ignore bot messages and specific system message subtypes
+    if (bot_id || !text) {
+      console.log('Ignoring bot message or message without text');
+      return;
+    }
+
+    // Ignore specific system subtypes but allow normal user message subtypes
+    const ignoredSubtypes = ['bot_message', 'channel_join', 'channel_leave', 'channel_topic', 'channel_purpose'];
+    if (subtype && ignoredSubtypes.includes(subtype)) {
+      console.log('Ignoring system message with subtype:', subtype);
       return;
     }
 
